@@ -1,0 +1,24 @@
+<svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="110" cy="110" r="100" fill="url(#bg)" />
+  <ellipse cx="110" cy="150" rx="60" ry="30" fill="#fff" fill-opacity="0.25" />
+  <ellipse cx="110" cy="110" rx="70" ry="80" fill="#fff" fill-opacity="0.5" />
+  <circle cx="110" cy="100" r="60" fill="#fff" />
+  <ellipse cx="110" cy="120" rx="40" ry="18" fill="#FDE68A" />
+  <circle cx="110" cy="100" r="50" fill="url(#face)" />
+  <ellipse cx="90" cy="95" rx="6" ry="8" fill="#fff" />
+  <ellipse cx="130" cy="95" rx="6" ry="8" fill="#fff" />
+  <ellipse cx="90" cy="97" rx="2.5" ry="3.5" fill="#222" />
+  <ellipse cx="130" cy="97" rx="2.5" ry="3.5" fill="#222" />
+  <path d="M95 120 Q110 135 125 120" stroke="#F59E42" stroke-width="4" fill="none" stroke-linecap="round" />
+  <ellipse cx="110" cy="170" rx="30" ry="8" fill="#fff" fill-opacity="0.3" />
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="100%" stop-color="#F59E42" />
+    </radialGradient>
+    <radialGradient id="face" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="100%" stop-color="#F59E42" />
+    </radialGradient>
+  </defs>
+</svg> 
