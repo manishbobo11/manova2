@@ -32,7 +32,26 @@ const getEmotionIcon = (emotion) => {
 
 const sanitizeData = (data) => JSON.parse(JSON.stringify(data));
 
-const DeepDiveFollowup = ({ domainName, onSave, userId: propUserId = "demo-user-123", isLoading = false, deepDiveData }) => {
+// --- GPT prompt utility ---
+const buildDeepDivePrompt = ({ text, selectedOption, emotion, score, customReason }) => `You are a helpful emotional wellness assistant. The user showed signs of stress on this question:
+
+- Question: ${text}
+- Selected Answer: ${selectedOption}
+- Emotional Tone: ${emotion || 'Not detected'}
+- Stress Score: ${typeof score === 'number' ? score : 'N/A'}
+- Reason: ${customReason || 'None'}
+
+Based on this, generate 3 personalized, specific follow-up options or clarifying questions that would help the user reflect or open up further. Respond with a JSON array of strings.`;
+
+const fallbackDeepDive = ["No suggestions found."];
+
+const buildSuggestionPrompt = (question) => `You are a mental wellness assistant.\nThe user answered:\n- Question: \"${question.text}\"\n- Answer: \"${question.answerLabel}\"\n- Emotion: \"${question.emotion || ''}\"\n- Notes: \"${question.notes || (question.tags && question.tags.join(', ')) || 'none'}\"\n\nSuggest 2 brief, realistic coping strategies tailored to this situation.\n\nRespond in JSON:\n{\n  \"suggestions\": [\"...\", \"...\"]\n}`;
+
+const fallbackSuggestions = [
+  "Try reflecting on what triggered this and talk to someone you trust."
+];
+
+const DeepDiveFollowup = ({ domainName, onSave, userId: propUserId, isLoading = false, deepDiveData, stressedQuestions = [] }) => {
   const [selectedReasons, setSelectedReasons] = useState([]);
   const [customReason, setCustomReason] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -41,10 +60,18 @@ const DeepDiveFollowup = ({ domainName, onSave, userId: propUserId = "demo-user-
   const [aiSummary, setAiSummary] = useState('');
   const [validationError, setValidationError] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [questionInsights, setQuestionInsights] = useState([]); // [{ followUpOptions, suggestions, loading, error }]
+  const [deepDiveOptions, setDeepDiveOptions] = useState({}); // { [questionId]: [options] }
+  const [loadingOptions, setLoadingOptions] = useState({}); // { [questionId]: bool }
+  const [errorOptions, setErrorOptions] = useState({}); // { [questionId]: errorMsg }
+  const [selectedFollowUps, setSelectedFollowUps] = useState({}); // { [questionId]: [selectedOption, ...] }
+  const [suggestionsMap, setSuggestionsMap] = useState({}); // { [questionId]: [suggestions] }
+  const [loadingSuggestions, setLoadingSuggestions] = useState({}); // { [questionId]: bool }
+  const [errorSuggestions, setErrorSuggestions] = useState({}); // { [questionId]: errorMsg }
 
-  // Use userId from prop, or fallback to Firebase Auth if available
+  // Always use the userId prop if provided and valid
   let userId = propUserId;
-  if (!userId || userId === 'demo-user-123') {
+  if (!userId) {
     try {
       const auth = getAuth();
       const firebaseUserId = auth.currentUser?.uid;
@@ -54,6 +81,9 @@ const DeepDiveFollowup = ({ domainName, onSave, userId: propUserId = "demo-user-
     } catch (e) {
       // Firebase Auth not available or not initialized
     }
+  }
+  if (!userId) {
+    console.warn('DeepDiveFollowup: No userId available after all attempts.');
   }
 
   useEffect(() => {
@@ -65,10 +95,120 @@ const DeepDiveFollowup = ({ domainName, onSave, userId: propUserId = "demo-user-
     }
   }, [isAnalyzing]);
 
+  // Fetch GPT deep dive options for each stressed question
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchDeepDiveOptions() {
+      if (!stressedQuestions.length) return;
+      const loading = {};
+      stressedQuestions.forEach(q => { loading[q.id] = true; });
+      setLoadingOptions(loading);
+      setErrorOptions({});
+      const results = await Promise.all(stressedQuestions.map(async (q) => {
+        try {
+          const prompt = buildDeepDivePrompt({
+            text: q.text,
+            selectedOption: q.selectedOption,
+            emotion: q.emotion,
+            score: q.score,
+            customReason: q.customReason || q.textInput || ''
+          });
+          const res = await mcpService.generateResponse(userId, prompt);
+          let content = res?.choices?.[0]?.message?.content?.trim() || res;
+          content = content.replace(/```json|```/g, '').trim();
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+            if (!Array.isArray(parsed)) parsed = fallbackDeepDive;
+          } catch (e) {
+            parsed = fallbackDeepDive;
+          }
+          return { id: q.id, options: parsed, error: null };
+        } catch (err) {
+          return { id: q.id, options: fallbackDeepDive, error: 'No suggestions found.' };
+        }
+      }));
+      if (!cancelled) {
+        const optionsObj = {};
+        const loadingObj = {};
+        const errorObj = {};
+        results.forEach(({ id, options, error }) => {
+          optionsObj[id] = options;
+          loadingObj[id] = false;
+          if (error) errorObj[id] = error;
+        });
+        setDeepDiveOptions(optionsObj);
+        setLoadingOptions(loadingObj);
+        setErrorOptions(errorObj);
+      }
+    }
+    fetchDeepDiveOptions();
+    return () => { cancelled = true; };
+  }, [userId, stressedQuestions]);
+
+  // Fetch GPT suggestions for each stressed question
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchSuggestions() {
+      if (!stressedQuestions.length) return;
+      const loading = {};
+      stressedQuestions.forEach(q => { loading[q.id] = true; });
+      setLoadingSuggestions(loading);
+      setErrorSuggestions({});
+      const results = await Promise.all(stressedQuestions.map(async (q) => {
+        try {
+          const prompt = buildSuggestionPrompt(q);
+          const res = await mcpService.generateResponse(userId, prompt);
+          let content = res?.choices?.[0]?.message?.content?.trim() || res;
+          content = content.replace(/```json|```/g, '').trim();
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+            if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) parsed = { suggestions: fallbackSuggestions };
+          } catch (e) {
+            parsed = { suggestions: fallbackSuggestions };
+          }
+          return { id: q.id, suggestions: parsed.suggestions, error: null };
+        } catch (err) {
+          return { id: q.id, suggestions: fallbackSuggestions, error: 'No suggestions found.' };
+        }
+      }));
+      if (!cancelled) {
+        const map = {};
+        const loadingObj = {};
+        const errorObj = {};
+        results.forEach(({ id, suggestions, error }) => {
+          map[id] = suggestions;
+          loadingObj[id] = false;
+          if (error) errorObj[id] = error;
+        });
+        setSuggestionsMap(map);
+        setLoadingSuggestions(loadingObj);
+        setErrorSuggestions(errorObj);
+      }
+    }
+    fetchSuggestions();
+    return () => { cancelled = true; };
+  }, [userId, stressedQuestions]);
+
   const toggleReason = (reason) => {
     setSelectedReasons((prev) =>
       prev.includes(reason) ? prev.filter((r) => r !== reason) : [...prev, reason]
     );
+  };
+
+  // Handler to toggle chip selection per question
+  const handleToggleFollowUp = (questionId, option) => {
+    setSelectedFollowUps(prev => {
+      const prevSelected = prev[questionId] || [];
+      if (prevSelected.includes(option)) {
+        // Deselect
+        return { ...prev, [questionId]: prevSelected.filter(o => o !== option) };
+      } else {
+        // Select
+        return { ...prev, [questionId]: [...prevSelected, option] };
+      }
+    });
   };
 
   const handleSubmit = async () => {
@@ -218,7 +358,35 @@ FORMAT:
           </div>
 
           {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 sm:p-8">
+          <div className="grid grid-cols-1 gap-6 p-6 sm:p-8">
+            {/* For each stressed question, show GPT suggestions dynamically */}
+            {stressedQuestions.map((q) => (
+              <div key={q.id} className="mb-8 p-6 bg-gray-50 rounded-xl shadow">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{q.text}</h3>
+                <div className="mb-2 text-sm text-gray-700">
+                  <span className="font-medium">Your answer:</span> {q.answerLabel}
+                  {q.customReason && <span> <span className="font-medium">| Reason:</span> {q.customReason}</span>}
+                  {q.emotion && <span> <span className="font-medium">| Tone:</span> {q.emotion}</span>}
+                  {q.tags && q.tags.length > 0 && <span> <span className="font-medium">| Tags:</span> {q.tags.join(', ')}</span>}
+                </div>
+                {/* Suggestions */}
+                <div className="mt-4">
+                  <h4 className="font-semibold text-indigo-700 mb-2">Personalized Suggestions</h4>
+                  {loadingSuggestions[q.id] ? (
+                    <span className="text-indigo-500 animate-pulse">Loading suggestions...</span>
+                  ) : suggestionsMap[q.id]?.length ? (
+                    <ul className="list-disc pl-5 space-y-1 text-gray-800">
+                      {suggestionsMap[q.id].map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-gray-500">Try reflecting on what triggered this and talk to someone you trust.</span>
+                  )}
+                </div>
+              </div>
+            ))}
+
             {/* Left Column - Input Section */}
             <div className="space-y-6">
               {/* Checkboxes */}
@@ -240,12 +408,12 @@ FORMAT:
                 checked={selectedReasons.includes(reason)}
                 onChange={() => toggleReason(reason)}
                         className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
+              />
                       <span className="ml-3 text-gray-700 group-hover:text-indigo-900">
                         {reason}
                       </span>
                     </motion.label>
-                  ))}
+          ))}
                 </div>
         </div>
 

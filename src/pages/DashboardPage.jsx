@@ -704,7 +704,7 @@ const DashboardPage = () => {
                     )}
                     {insight.customText && (
                       <div className="bg-gray-50 border-l-4 border-blue-300 p-4 rounded mb-2 mt-2">
-                        <div className="italic text-gray-700 mb-1">“{insight.customText}”</div>
+                        <div className="italic text-gray-700 mb-1">"{insight.customText}"</div>
                         <div className="flex flex-wrap gap-2 text-xs mt-1">
                           {insight.sentiment && (
                             <span className={`px-2 py-1 rounded-full font-medium ${insight.sentiment === 'Negative' ? 'bg-red-100 text-red-700' : insight.sentiment === 'Positive' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{insight.sentiment}</span>

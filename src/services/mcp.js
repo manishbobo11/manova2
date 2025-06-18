@@ -362,7 +362,7 @@ export async function generateTherapistReflection(userId, currentCheckin) {
   let parsed;
   try {
     parsed = JSON.parse(content);
-  } catch (e) {
+    } catch (e) {
     // fallback: try to extract JSON
     const match = content.match(/\{[\s\S]*\}/);
     if (match) {

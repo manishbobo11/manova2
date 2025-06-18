@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, collection } from 'firebase/firestore';
 import { toFirestoreSafe } from '../utils/firestoreSafe';
+import { getAuth } from 'firebase/auth';
+import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   // Replace with your Firebase config
@@ -15,7 +17,9 @@ const firebaseConfig = {
 // Only initialize if not already initialized
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
-export { db };
+const auth = getAuth(app);
+const analytics = getAnalytics(app);
+export { db, auth, analytics };
 
 export const ContextStore = {
   async getUserContext(userId) {
