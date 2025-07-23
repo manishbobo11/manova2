@@ -80,10 +80,6 @@ const TherapistCard = ({
                   src={avatar || '/images/default-avatar.svg'} 
                   alt={name}
                   className="w-16 h-16 rounded-2xl object-cover"
-                  onError={(e) => {
-                    e.target.src = '/images/default-avatar.svg';
-                    e.target.onerror = null; // Prevent infinite loop
-                  }}
                 />
               </div>
               

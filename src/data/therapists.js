@@ -7,7 +7,7 @@ export const therapistDatabase = [
   {
     id: 1,
     name: "Dr. Sarah Johnson",
-    avatar: "/images/therapists/sarah-johnson.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Work Stress", "Anxiety", "Burnout Prevention"],
     languages: ["English"],
     mode: ["Online", "In-Person"],
@@ -34,7 +34,7 @@ export const therapistDatabase = [
   {
     id: 2,
     name: "Dr. Raj Patel",
-    avatar: "/images/therapists/raj-patel.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Relationships", "Family Therapy", "Cultural Issues"],
     languages: ["English", "Hindi", "Gujarati"],
     mode: ["Online", "In-Person"],
@@ -61,7 +61,7 @@ export const therapistDatabase = [
   {
     id: 3,
     name: "Dr. Priya Sharma",
-    avatar: "/images/therapists/priya-sharma.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Health Anxiety", "Chronic Illness", "Medical Trauma"],
     languages: ["English", "Hindi"],
     mode: ["Online"],
@@ -87,7 +87,7 @@ export const therapistDatabase = [
   {
     id: 4,
     name: "Dr. Michael Chen",
-    avatar: "/images/therapists/michael-chen.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Academic Stress", "Career Transition", "Performance Anxiety"],
     languages: ["English", "Mandarin"],
     mode: ["Online", "In-Person"],
@@ -114,7 +114,7 @@ export const therapistDatabase = [
   {
     id: 5,
     name: "Dr. Anita Gupta",
-    avatar: "/images/therapists/anita-gupta.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Mindfulness", "General Wellness", "Stress Management"],
     languages: ["English", "Hindi", "Punjabi"],
     mode: ["Online", "In-Person"],
@@ -141,7 +141,7 @@ export const therapistDatabase = [
   {
     id: 6,
     name: "Dr. Emily Rodriguez",
-    avatar: "/images/therapists/emily-rodriguez.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Trauma Recovery", "PTSD", "Emotional Regulation"],
     languages: ["English", "Spanish"],
     mode: ["Online", "In-Person"],
@@ -168,7 +168,7 @@ export const therapistDatabase = [
   {
     id: 7,
     name: "Dr. James Wilson",
-    avatar: "/images/therapists/james-wilson.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Depression", "Mood Disorders", "Life Transitions"],
     languages: ["English"],
     mode: ["Online", "In-Person"],
@@ -195,7 +195,7 @@ export const therapistDatabase = [
   {
     id: 8,
     name: "Dr. Lisa Thompson",
-    avatar: "/images/therapists/lisa-thompson.jpg",
+    avatar: "/images/default-avatar.svg",
     specializations: ["Couples Therapy", "Communication", "Relationship Issues"],
     languages: ["English", "French"],
     mode: ["Online", "In-Person"],
