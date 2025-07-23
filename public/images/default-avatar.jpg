@@ -1,0 +1,12 @@
+<!-- This would normally be a JPG file, but for demo purposes creating an SVG -->
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="16" fill="url(#gradient)"/>
+  <circle cx="32" cy="24" r="8" fill="white" opacity="0.9"/>
+  <path d="m20 48c0-6.627 5.373-12 12-12s12 5.373 12 12v2H20v-2z" fill="white" opacity="0.9"/>
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="100%" style="stop-color:#6366F1"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 const Footer = () => {
   return (
     <footer className="w-full bg-white/80 backdrop-blur-md shadow-inner py-6 mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-center text-gray-500 text-sm">
+      <div className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-16 flex flex-col md:flex-row items-center justify-between gap-4 text-center text-gray-500 text-sm">
         <div className="text-gray-600 text-base font-medium">
           © {new Date().getFullYear()} Manova
         </div>

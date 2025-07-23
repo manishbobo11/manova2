@@ -47,7 +47,7 @@ export default function PersonalLife() {
       </div>
       <div className="flex flex-col gap-3 mb-4">
         {options.map((label, idx) => (
-          <label key={idx} className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${selectedScore === idx ? 'bg-indigo-50 border-indigo-400' : 'bg-gray-50 border-gray-200 hover:border-indigo-300'}`}>
+          <label key={idx} className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${selectedScore === idx ? 'bg-indigo-50 border-indigo-400' : 'bg-neutral-50 border-neutral-200 hover:border-indigo-300'}`}>
             <input
               type="radio"
               name="selfcare-frequency"

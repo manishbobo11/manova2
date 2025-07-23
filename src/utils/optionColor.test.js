@@ -33,4 +33,41 @@ describe('getOptionColor', () => {
   it('returns gray for low value on negative question', () => {
     expect(getOptionColor({ value: 1 }, false)).toBe('bg-gray-100 text-gray-800');
   });
-}); 
+});
+
+// Test for analyzeStressLevel function
+export async function testAnalyzeStressLevel() {
+  const { analyzeStressLevel } = await import('../services/aiSuggestions');
+  
+  const testCases = [
+    {
+      question: "How often do you feel overwhelmed at work?",
+      answer: "Very Often",
+      expectedIntensity: "High"
+    },
+    {
+      question: "How satisfied are you with your sleep quality?",
+      answer: "Excellent",
+      expectedIntensity: "Low"
+    },
+    {
+      question: "How often do financial concerns worry you?",
+      answer: "Sometimes",
+      expectedIntensity: "Moderate"
+    }
+  ];
+
+  console.log('Testing analyzeStressLevel function...');
+  
+  for (const testCase of testCases) {
+    try {
+      const result = await analyzeStressLevel(testCase.answer, testCase.question);
+      console.log(`\nQuestion: "${testCase.question}"`);
+      console.log(`Answer: "${testCase.answer}"`);
+      console.log(`Result:`, result);
+      console.log(`Expected intensity: ${testCase.expectedIntensity}, Got: ${result.intensity}`);
+    } catch (error) {
+      console.error(`Error testing "${testCase.answer}":`, error);
+    }
+  }
+} 

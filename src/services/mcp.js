@@ -1,6 +1,7 @@
 import { ContextStore } from './firebase';
 import { toFirestoreSafe } from '../utils/firestoreSafe';
 import { getCheckinHistory } from './userSurveyHistory';
+import { contextualMemoryBuilder } from './userContextBuilder';
 
 function getDeepDivePrompt(domain, answers) {
   const context = answers.map(a => `Q: ${a.id}, Score: ${a.answer}`).join('\n');
@@ -126,7 +127,30 @@ class MCPService {
 
   _formatContextForPrompt(context) {
     if (!context) return 'No previous context available.';
-    return `User Context:\n    - Recent Mood: ${context.mood || 'Not recorded'}\n    - Survey History: ${context.surveyHistory?.length || 0} surveys completed\n    - Stress Triggers: ${context.stressTriggers?.join(', ') || 'None identified'}\n    - Coping Strategies: ${context.copingStrategies?.join(', ') || 'None identified'}\n    Use this context to personalize your response while maintaining privacy.`;
+    
+    let contextString = `User Context:\n    - Recent Mood: ${context.mood || 'Not recorded'}\n    - Survey History: ${context.surveyHistory?.length || 0} surveys completed\n    - Stress Triggers: ${context.stressTriggers?.join(', ') || 'None identified'}\n    - Coping Strategies: ${context.copingStrategies?.join(', ') || 'None identified'}`;
+    
+    // Add contextual memory if available
+    if (context.contextualMemory) {
+      const memory = context.contextualMemory;
+      if (memory.input && memory.domain) {
+        contextString += `\n    - Recent ${memory.domain} Concerns: ${memory.input}`;
+      }
+    }
+    
+    // Add stress patterns if available
+    if (context.stressPatterns) {
+      const patterns = context.stressPatterns;
+      if (patterns.highStressDomains && patterns.highStressDomains.length > 0) {
+        contextString += `\n    - High Stress Domains: ${patterns.highStressDomains.join(', ')}`;
+      }
+      if (patterns.stressIntensity) {
+        contextString += `\n    - Overall Stress Intensity: ${patterns.stressIntensity}`;
+      }
+    }
+    
+    contextString += `\n    Use this context to personalize your response while maintaining privacy.`;
+    return contextString;
   }
 
   async _updateContextWithInsights(userId, insights) {
@@ -157,23 +181,69 @@ class MCPService {
   }
 
   /**
-   * Generate deep dive follow-up options for a domain based on user answers.
-   * Returns: { checkboxes: [string], textboxPrompt: string, rootEmotion: string }
+   * Generate deep dive follow-up options for a domain based on user answers using ManovaAgent stress detection.
+   * Returns: { checkboxes: [string], textboxPrompt: string, rootEmotion: string, stressedQuestions: [object] }
    */
   async generateDeepDiveFollowup(domain, answers) {
-    const prompt = `
-You are a wellness AI therapist. Based on this domain: "${domain}" and these survey answers: ${JSON.stringify(answers)}, generate a deep dive JSON in this format:
+    // Import ManovaAgent for enhanced psychological stress detection
+    const { analyzeEnhancedStress } = await import('./ai/manovaAgent.js');
+    
+    // Use ManovaAgent to analyze each answer for stress
+    const stressedQuestions = [];
+    let highestStressLevel = 0;
+    let dominantEmotion = 'concern';
+    
+    for (const answer of answers) {
+      try {
+        // Use enhanced psychological analysis for each question-answer pair
+        const enhancedResult = await analyzeEnhancedStress(
+          `Question ${answer.id}: ${answer.text || 'Survey question'}`,
+          answer.answer?.toString() || 'No answer provided',
+          domain
+        );
+        
+        // Track highest stress for overall emotion using psychological insights
+        if (enhancedResult.enhancedScore > highestStressLevel) {
+          highestStressLevel = enhancedResult.enhancedScore;
+          dominantEmotion = enhancedResult.enhancedEmotion.toLowerCase();
+        }
+        
+        // Add to stressed questions if shouldTrigger is true (psychological assessment)
+        if (enhancedResult.shouldTrigger) {
+          stressedQuestions.push({
+            id: answer.id,
+            text: answer.text,
+            answer: answer.answer,
+            stressLevel: enhancedResult.enhancedIntensity,
+            stressScore: enhancedResult.enhancedScore,
+            emotion: enhancedResult.enhancedEmotion,
+            reason: enhancedResult.reason,
+            psychologicalAnalysis: true
+          });
+        }
+      } catch (error) {
+        console.warn(`Failed to analyze stress for question ${answer.id}:`, error);
+        // If ManovaAgent fails, don't add to stressed questions - only use LLM analysis
+      }
+    }
 
+    // Generate contextual deep dive based on ManovaAgent analysis
+    const prompt = `
+You are a wellness AI therapist. Based on ManovaAgent stress analysis for domain "${domain}":
+
+Stressed Questions Found: ${stressedQuestions.length}
+Highest Stress Level: ${highestStressLevel}/10
+Dominant Emotion: ${dominantEmotion}
+Survey Answers: ${JSON.stringify(answers)}
+
+Generate a deep dive JSON in this format:
 {
-  "rootEmotion": "frustration",
-  "checkboxes": ["Toxic environment", "Unclear boundaries", "Feeling misunderstood", "Lack of growth"],
-  "textboxPrompt": "Is there anything more you'd like to share about what's making this difficult?"
+  "rootEmotion": "anxiety|frustration|overwhelm|sadness|stress|concern",
+  "checkboxes": ["Specific stress trigger 1", "Specific stress trigger 2", "Specific stress trigger 3", "Specific stress trigger 4"],
+  "textboxPrompt": "Gentle, empathetic prompt encouraging sharing"
 }
 
-Make sure:
-- The emotion comes from pattern in scores.
-- Checkboxes are personalized, natural-language phrases (not generic).
-- Text prompt is gentle, human-like, and thoughtful.
+Make the checkboxes highly specific to the ${domain} domain and the stress patterns detected. Use the dominant emotion "${dominantEmotion}" to guide the tone.
 Strictly output only valid JSON.
 `;
 
@@ -182,18 +252,35 @@ Strictly output only valid JSON.
       let content = response?.choices?.[0]?.message?.content || response;
       // Remove code fences if present
       content = content.replace(/```json|```/g, '').trim();
-      return JSON.parse(content);
+      const result = JSON.parse(content);
+      
+      // Add ManovaAgent analysis results to the response
+      result.stressedQuestions = stressedQuestions;
+      result.stressAnalysis = {
+        highestStressLevel,
+        dominantEmotion,
+        totalStressedQuestions: stressedQuestions.length
+      };
+      
+      return result;
     } catch (error) {
       console.error('Error generating deep dive followup:', error);
-      // Return a fallback response if parsing fails
+      // Return a fallback response with ManovaAgent results if parsing fails
       return {
-        rootEmotion: "concern",
+        rootEmotion: dominantEmotion,
         checkboxes: [
-          "Feeling overwhelmed",
-          "Need for support",
-          "Looking for guidance"
+          "Feeling overwhelmed with current demands",
+          "Need for better support systems",
+          "Difficulty managing stress levels",
+          "Looking for effective coping strategies"
         ],
-        textboxPrompt: "Would you like to share more about what's on your mind?"
+        textboxPrompt: "Would you like to share more about what's been weighing on your mind lately?",
+        stressedQuestions,
+        stressAnalysis: {
+          highestStressLevel,
+          dominantEmotion,
+          totalStressedQuestions: stressedQuestions.length
+        }
       };
     }
   }
@@ -434,4 +521,36 @@ Reply with a JSON object:
     }
   }
   return parsed;
+} 
+
+/**
+ * Generate psychological causes and solutions for a user's answer.
+ * Returns: { causes: [...], solutions: [...] }
+ */
+export async function generateCausesAndSolutions(answer) {
+  const prompt = `The user answered: "${answer}". Identify 3 psychological reasons why this may cause stress. Then give 3 simple, personalized suggestions.
+
+Return ONLY a valid JSON object with this exact structure:
+{
+  "causes": ["...", "...", "..."],
+  "solutions": ["...", "...", "..."]
+}
+Do not include any explanations, markdown, or anything else. Only return the JSON object.`;
+
+  try {
+    // Replace with your LLM API call (e.g., OpenAI, Claude, etc.)
+    const completion = await callClaude(prompt); // or callOpenAI(prompt)
+    const cleaned = completion.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.warn("⚠️ Cause/solution generation failed, using fallback");
+    return {
+      causes: ["Unable to determine cause"],
+      solutions: [
+        "Consider journaling your feelings",
+        "Try speaking to a therapist",
+        "Practice mindfulness or relaxation techniques"
+      ]
+    };
+  }
 } 

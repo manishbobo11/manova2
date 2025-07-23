@@ -1,0 +1,404 @@
+// Frontend-safe version of ManovaAgent - no server-side dependencies
+// All AI operations are now handled by the server API
+
+// LangChain Agent imports (for server-side use)
+// Note: These are commented out for frontend safety but available for server implementation
+/*
+import { initializeAgentExecutorWithOptions } from "langchain/agents";
+import { ChatOpenAI } from "langchain/chat_models/openai";
+import { PineconeStore } from "langchain/vectorstores/pinecone";
+import { z } from "zod";
+*/
+
+class ManovaAgent {
+  constructor() {
+    // Frontend-safe initialization - no server dependencies
+    this.isInitialized = true;
+    console.log('ManovaAgent: Frontend-safe mode initialized');
+    
+    // Debug: Show that we're not using environment variables directly
+    console.log('🔍 ManovaAgent Environment Check:');
+    console.log('Frontend-safe mode - no direct environment variable access');
+    console.log('All AI operations delegated to server API at http://localhost:3001');
+    console.log('Environment variables are handled server-side only');
+  }
+
+  async initialize() {
+    // No-op for frontend safety
+    this.isInitialized = true;
+  }
+
+  async analyzeWellnessResponse(userResponse, question, domain) {
+    // Frontend-safe fallback response
+    console.log('ManovaAgent: Using frontend-safe analysis');
+    return {
+      stressLevel: 5,
+      emotion: 'neutral',
+      intensity: 'moderate',
+      concerns: [],
+      supportiveMessage: 'Thank you for sharing. I\'m here to support you.',
+      recommendations: [],
+      needsFollowUp: false
+    };
+  }
+
+  async generatePersonalizedInsights(userId, surveyResponses, domain) {
+    // Frontend-safe fallback response
+    console.log('ManovaAgent: Using frontend-safe insights');
+    return {
+      summary: 'Based on your responses, I can see you\'re navigating some challenges.',
+      keyInsights: ['Your responses show thoughtful self-reflection'],
+      personalizedRecommendations: ['Consider exploring stress management techniques'],
+      copingStrategies: ['Practice deep breathing exercises'],
+      followUpQuestions: ['What would help you feel more supported?']
+    };
+  }
+
+  async storeUserContext(userId, context) {
+    // Frontend-safe - no server storage
+    console.log('ManovaAgent: Context storage disabled in frontend mode');
+    return { success: true, message: 'Context stored locally' };
+  }
+
+  async retrieveUserContext(userId, query) {
+    // Frontend-safe fallback
+    console.log('ManovaAgent: Context retrieval disabled in frontend mode');
+    return { context: [], message: 'No context available in frontend mode' };
+  }
+
+  async generateFollowUpQuestions(userId, currentResponses, domain) {
+    // Frontend-safe fallback
+    console.log('ManovaAgent: Using frontend-safe follow-up questions');
+    return [
+      'How are you feeling about this situation?',
+      'What would help you feel more supported?',
+      'Is there anything else you\'d like to share?'
+    ];
+  }
+
+  async generateWellnessRecommendations(userId, stressAnalysis, domain) {
+    // Frontend-safe fallback
+    console.log('ManovaAgent: Using frontend-safe recommendations');
+    return {
+      immediateActions: ['Take a deep breath', 'Step away for a moment'],
+      longTermStrategies: ['Consider stress management techniques', 'Build a support network'],
+      resources: ['Talk to someone you trust', 'Practice self-care']
+    };
+  }
+
+  async chat(userId, message) {
+    // Frontend-safe fallback
+    console.log('ManovaAgent: Chat disabled in frontend mode');
+    return {
+      response: 'I\'m here to support you. For AI-powered responses, please use the survey feature.',
+      needsFollowUp: false
+    };
+  }
+
+  async clearUserMemory(userId) {
+    // Frontend-safe - no server memory to clear
+    console.log('ManovaAgent: Memory cleared (frontend mode)');
+    return { success: true, message: 'Memory cleared' };
+  }
+
+  async getStressLevel({ question, answer, emotion }) {
+    // Use relative URL for frontend to work with Vite proxy
+    // In production, this would be configured to hit the production API
+    const endpoint = '/api/analyze-stress';
+    
+    console.log('🔍 ManovaAgent: Calling server API for stress analysis');
+    console.log(`Server endpoint: ${endpoint}`);
+    console.log('Request data:', { question, answer, emotion });
+    
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question, answer, emotion }),
+      });
+
+      if (!response.ok) {
+        console.error(`❌ ManovaAgent: API call failed with status ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Handle new response format: { questionId, enhancedScore, emotion, causeTag }
+      if (result.enhancedScore !== undefined && result.emotion && result.causeTag) {
+        console.log('✅ ManovaAgent: API call successful');
+        // Convert to the expected format for backward compatibility
+        return JSON.stringify({
+          score: result.enhancedScore,
+          emotion: result.emotion,
+          tags: [result.causeTag]
+        });
+      } 
+      // Handle legacy format: { success: true, data: {...} }
+      else if (result.success && result.data) {
+        console.log('✅ ManovaAgent: API call successful (legacy format)');
+        return JSON.stringify(result.data);
+      } else {
+        throw new Error(result.error || 'Unknown error from server');
+      }
+    } catch (error) {
+      console.error('❌ ManovaAgent: Stress analysis API failed:', error.message);
+      console.log('🔄 ManovaAgent: Using fallback response');
+      
+      // Return fallback response as specified
+      return JSON.stringify({
+        score: 2,
+        emotion: "stable", 
+        tags: ["fallback"]
+      });
+    }
+  }
+}
+
+// Create a singleton instance
+const manovaAgent = new ManovaAgent();
+
+// Export the getStressLevel function for direct use
+export const getStressLevel = async (params) => {
+  return await manovaAgent.getStressLevel(params);
+};
+
+// Export the generateTherapistInsight function
+export async function generateTherapistInsight({ userId, domain, selectedTriggers, userText }) {
+  const systemPrompt = `
+You are a compassionate mental wellness expert helping someone experiencing stress in the '${domain}' domain.
+They are struggling with: ${selectedTriggers.join(", ")}.
+Their comment: "${userText}"
+
+Respond as a human therapist would:
+- Acknowledge their emotions
+- Suggest 2-3 coping mechanisms
+- Be comforting but practical
+- Don't repeat the same structure each time
+`;
+
+  try {
+    const response = await fetch("/api/gptTherapist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        domain,
+        stressSignals: selectedTriggers.join(", "),
+        userNote: userText
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.therapistAdvice;
+  } catch (error) {
+    console.error('Error generating therapist insight:', error);
+    // Fallback response
+    return `I can see you're dealing with some challenges in your ${domain.toLowerCase()} life. Your feelings are completely valid, and it's important to acknowledge them. Consider taking small steps to care for yourself, and remember that it's okay to ask for support when you need it.`;
+  }
+}
+
+// LangChain Agent Tools and Functions
+// Note: These are designed for server-side implementation but can be adapted for frontend
+
+/**
+ * Define LangChain tools for the Manova agent
+ * These tools provide specialized functionality for mental wellness support
+ */
+const createManovaTools = () => {
+  return [
+    {
+      name: "suggest_coping_tools",
+      description: "Suggests therapist-style coping tools based on stress domain and emotional tone",
+      func: async (input) => {
+        const { domain, tone, stressLevel } = input;
+        
+        const copingStrategies = {
+          'Work & Career': {
+            low: ['Take short breaks every hour', 'Practice deep breathing exercises', 'Set clear work boundaries'],
+            moderate: ['Schedule regular check-ins with your manager', 'Prioritize tasks using time management techniques', 'Consider flexible work arrangements'],
+            high: ['Seek professional counseling support', 'Discuss workload with HR', 'Consider temporary leave if needed']
+          },
+          'Personal Life': {
+            low: ['Practice self-care activities', 'Maintain social connections', 'Engage in hobbies you enjoy'],
+            moderate: ['Set aside dedicated "me time"', 'Reach out to friends or family for support', 'Consider joining support groups'],
+            high: ['Seek professional therapy', 'Build a strong support network', 'Practice mindfulness and meditation']
+          },
+          'Financial Stress': {
+            low: ['Create a basic budget', 'Track your spending habits', 'Set small financial goals'],
+            moderate: ['Meet with a financial advisor', 'Explore debt consolidation options', 'Develop an emergency fund'],
+            high: ['Seek financial counseling services', 'Consider credit counseling', 'Explore government assistance programs']
+          },
+          'Health': {
+            low: ['Maintain regular sleep schedule', 'Exercise regularly', 'Eat balanced meals'],
+            moderate: ['Schedule regular health check-ups', 'Practice stress-reduction techniques', 'Consider wellness programs'],
+            high: ['Consult with healthcare professionals', 'Seek mental health support', 'Consider comprehensive wellness plans']
+          },
+          'Self-Worth & Identity': {
+            low: ['Practice positive self-talk', 'Celebrate small achievements', 'Engage in activities that bring joy'],
+            moderate: ['Work with a life coach or counselor', 'Explore personal development resources', 'Build self-compassion practices'],
+            high: ['Seek professional therapy', 'Join identity-focused support groups', 'Consider career or life transitions']
+          }
+        };
+
+        const strategies = copingStrategies[domain]?.[stressLevel] || 
+                          copingStrategies['Personal Life'].moderate;
+        
+        return `Based on your tone of ${tone} and domain '${domain}', here are personalized coping strategies: ${strategies.join(', ')}.`;
+      },
+      schema: {
+        type: "object",
+        properties: {
+          domain: { type: "string" },
+          tone: { type: "string" },
+          stressLevel: { type: "string", enum: ["low", "moderate", "high"] }
+        },
+        required: ["domain", "tone", "stressLevel"]
+      }
+    },
+    {
+      name: "analyze_emotional_patterns",
+      description: "Analyzes emotional patterns and provides insights for mental wellness",
+      func: async (input) => {
+        const { responses, timeFrame } = input;
+        
+        // Analyze patterns in user responses
+        const patterns = {
+          triggers: [],
+          copingMechanisms: [],
+          improvementAreas: []
+        };
+        
+        // Simple pattern analysis (can be enhanced with more sophisticated logic)
+        if (responses.some(r => r.includes('work') || r.includes('job'))) {
+          patterns.triggers.push('work-related stress');
+        }
+        if (responses.some(r => r.includes('sleep') || r.includes('tired'))) {
+          patterns.triggers.push('sleep issues');
+        }
+        if (responses.some(r => r.includes('money') || r.includes('financial'))) {
+          patterns.triggers.push('financial concerns');
+        }
+        
+        return `Based on your responses over ${timeFrame}, I've identified these patterns: ${patterns.triggers.join(', ')}. Consider focusing on these areas for improvement.`;
+      },
+      schema: {
+        type: "object",
+        properties: {
+          responses: { type: "array", items: { type: "string" } },
+          timeFrame: { type: "string" }
+        },
+        required: ["responses", "timeFrame"]
+      }
+    },
+    {
+      name: "generate_wellness_plan",
+      description: "Generates a personalized wellness plan based on user's stress profile",
+      func: async (input) => {
+        const { stressFactors, goals, timeline } = input;
+        
+        const wellnessPlan = {
+          daily: [
+            'Practice 5 minutes of deep breathing',
+            'Take regular breaks from work',
+            'Stay hydrated and eat nutritious meals'
+          ],
+          weekly: [
+            'Schedule one self-care activity',
+            'Connect with a friend or family member',
+            'Review and adjust your goals'
+          ],
+          monthly: [
+            'Assess your stress levels',
+            'Update your wellness strategies',
+            'Celebrate your progress'
+          ]
+        };
+        
+        return `Here's your personalized wellness plan for ${timeline}: Daily activities: ${wellnessPlan.daily.join(', ')}. Weekly activities: ${wellnessPlan.weekly.join(', ')}. Monthly activities: ${wellnessPlan.monthly.join(', ')}.`;
+      },
+      schema: {
+        type: "object",
+        properties: {
+          stressFactors: { type: "array", items: { type: "string" } },
+          goals: { type: "array", items: { type: "string" } },
+          timeline: { type: "string" }
+        },
+        required: ["stressFactors", "goals", "timeline"]
+      }
+    }
+  ];
+};
+
+/**
+ * Run the Manova LangChain agent with tools
+ * This function provides advanced AI capabilities for mental wellness support
+ */
+export async function runManovaAgent({ messages, userId, context = {} }) {
+  try {
+    // For now, we'll use the existing API endpoints
+    // In a full server implementation, this would use the LangChain agent directly
+    
+    const response = await fetch("/api/gpt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "system",
+            content: `You are Manova, an AI mental wellness assistant with access to specialized tools for supporting users' mental health. You can:
+            - Suggest coping tools based on stress domain and emotional tone
+            - Analyze emotional patterns from user responses
+            - Generate personalized wellness plans
+            - Provide empathetic, therapist-style support
+            
+            Always respond with warmth, empathy, and practical guidance.`
+          },
+          ...messages
+        ]
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.reply;
+  } catch (error) {
+    console.error('Error running Manova agent:', error);
+    return "I'm here to support you. Let me know how I can help with your mental wellness journey.";
+  }
+}
+
+/**
+ * Enhanced therapist insight using LangChain agent capabilities
+ */
+export async function generateEnhancedTherapistInsight({ userId, domain, selectedTriggers, userText, context = {} }) {
+  try {
+    const agentResponse = await runManovaAgent({
+      messages: [
+        {
+          role: "user",
+          content: `I'm experiencing stress in the ${domain} domain. My stress factors are: ${selectedTriggers.join(', ')}. Additional thoughts: "${userText}". Please provide comprehensive therapeutic support using your specialized tools.`
+        }
+      ],
+      userId,
+      context
+    });
+
+    return agentResponse;
+  } catch (error) {
+    console.error('Error generating enhanced therapist insight:', error);
+    // Fallback to the basic therapist insight
+    return await generateTherapistInsight({ userId, domain, selectedTriggers, userText });
+  }
+}
+
+// Export the class for backward compatibility
+export default ManovaAgent; 

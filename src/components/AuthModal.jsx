@@ -33,7 +33,7 @@ const AuthModal = ({ isOpen, onClose }) => {
             </Link>
             <Link
               to="/login"
-              className="block w-full py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-center font-medium hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-300 backdrop-blur-sm"
+              className="block w-full py-3 px-4 rounded-lg border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 text-center font-medium hover:bg-neutral-50 dark:hover:bg-neutral-700/50 transition-all duration-300 backdrop-blur-sm"
               onClick={onClose}
             >
               Already a Member? Login

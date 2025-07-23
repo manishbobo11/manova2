@@ -1,130 +1,359 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  BarChart, ClipboardList, Activity, BookOpen, Users, Dumbbell,
+  Heart, Brain, Sparkles, Calendar, ArrowRight, Star, Shield,
+  Moon, Sun, Leaf, Wind, CloudRain, Sunrise, CheckCircle,
+  Play, Pause, Volume2, VolumeX, Clock, Target, Award,
+  MessageCircle, Phone, Mail, Instagram, Twitter, Facebook,
+  ChevronDown, Plus, Minus, Quote, User, Eye, EyeOff
+} from "lucide-react";
 import { useAuth } from '../contexts/AuthContext';
 
 const HomePage = () => {
   const { currentUser } = useAuth();
-  // Extract first name from displayName or email
-  let firstName = 'User';
-  if (currentUser) {
-    if (currentUser.displayName) {
-      firstName = currentUser.displayName.split(' ')[0];
-    } else if (currentUser.email) {
-      firstName = currentUser.email.split('@')[0].split(/[._]/)[0];
-      firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [showBreathing, setShowBreathing] = useState(false);
+  
+  const getUserDisplayName = () => {
+    if (currentUser?.displayName) {
+      return currentUser.displayName.split(' ')[0];
     }
-  }
+    if (currentUser?.email) {
+      const emailName = currentUser.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    return 'there';
+  };
+
+  const moods = [
+    { emoji: '😊', label: 'Great', color: 'from-green-400 to-emerald-500' },
+    { emoji: '🙂', label: 'Good', color: 'from-blue-400 to-blue-500' },
+    { emoji: '😐', label: 'Okay', color: 'from-yellow-400 to-orange-500' },
+    { emoji: '😔', label: 'Difficult', color: 'from-purple-400 to-purple-500' },
+    { emoji: '😰', label: 'Anxious', color: 'from-red-400 to-red-500' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white relative overflow-hidden flex flex-col pt-20">
-      {/* Animated Floating Bubbles */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-10 left-1/4 w-16 h-16 bg-orange-200 rounded-full opacity-60 animate-bubble-slow" />
-        <div className="absolute top-1/2 left-1/3 w-10 h-10 bg-pink-200 rounded-full opacity-50 animate-bubble-medium" />
-        <div className="absolute bottom-10 right-1/4 w-20 h-20 bg-blue-200 rounded-full opacity-40 animate-bubble-fast" />
-      </div>
-      {/* Wavy Divider (animated) at the top */}
-      <div className="absolute top-0 left-0 w-full z-10 animate-wave">
-        <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-24">
-          <path fill="#fff" d="M0,64L48,74.7C96,85,192,107,288,117.3C384,128,480,128,576,117.3C672,107,768,85,864,90.7C960,96,1056,128,1152,138.7C1248,149,1344,139,1392,133.3L1440,128L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z" />
-        </svg>
-      </div>
-      {/* Hero Section */}
-      <div className="w-full max-w-5xl mx-auto mt-4 sm:mt-8 mb-4 sm:mb-6 scale-content">
-        <div className="text-center">
-          <h1 className="responsive-heading font-bold text-gray-900 mb-1 sm:mb-2 leading-tight">
-            {firstName}, Welcome to Your Wellness Journey
-          </h1>
-          <p className="responsive-text text-gray-600 mb-2 sm:mb-4">
-            Track your progress, discover insights, and take steps towards better mental health
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-          {/* Start Survey Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-            whileHover={{ scale: 1.05, rotate: -2 }}
-            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 shadow-lg"
-          >
-            <motion.img src="/icons/assessment.svg" alt="Assessment" className="w-8 h-8 mb-6" whileHover={{ scale: 1.2, rotate: -8 }} transition={{ type: 'spring', stiffness: 300 }} />
-            <h2 className="responsive-heading font-semibold text-gray-900 mb-4">Start Assessment</h2>
-            <p className="responsive-text text-gray-600 mb-6">
-              Begin your bi-weekly check-in to track your current state and receive personalized recommendations
-            </p>
-            <Link
-              to="/survey"
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 transition-colors duration-300 shadow-md hover:shadow-lg responsive-text"
-            >
-              Begin Bi-Weekly Check-In
-            </Link>
-          </motion.div>
-          {/* View Dashboard Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            whileHover={{ scale: 1.05, rotate: 2 }}
-            className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 shadow-lg"
-          >
-            <motion.img src="/icons/analytics.svg" alt="Analytics" className="w-8 h-8 mb-6" whileHover={{ scale: 1.2, rotate: 8 }} transition={{ type: 'spring', stiffness: 300 }} />
-            <h2 className="responsive-heading font-semibold text-gray-900 mb-4">View Analytics</h2>
-            <p className="responsive-text text-gray-600 mb-6">
-              Explore your progress over time with detailed insights and visual reports
-            </p>
-            <Link
-              to="/dashboard"
-              className="inline-block px-6 py-3 bg-purple-600 text-white rounded-full font-medium hover:bg-purple-700 transition-colors duration-300 shadow-md hover:shadow-lg responsive-text"
-            >
-              View Analytics
-            </Link>
-          </motion.div>
-        </div>
-      </div>
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 md:pb-16 z-10 w-full">
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-purple-50/30">
+      {/* Clean Header */}
+      <div className="w-full px-4 sm:px-8 lg:px-16 py-12">
+        <div className="max-w-[1440px] mx-auto w-full">
+        <motion.div 
+          className="w-full"
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="mt-12 md:mt-16"
+          transition={{ duration: 0.5 }}
         >
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6 md:mb-8 text-center">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {[
-              { icon: '/icons/meditation.svg', title: 'Meditation', link: '/meditation' },
-              { icon: '/icons/exercise.svg', title: 'Exercise', link: '/exercise' },
-              { icon: '/icons/articles.svg', title: 'Articles', link: '/articles' },
-              { icon: '/icons/community.svg', title: 'Community', link: '/community' }
-            ].map((action, index) => (
-              <motion.div
-                key={action.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.8 + index * 0.1 }}
-                whileHover={{ scale: 1.08, rotate: index % 2 === 0 ? -2 : 2 }}
-                className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300"
-              >
-                <motion.img src={action.icon} alt={action.title} className="w-6 h-6 mb-4" whileHover={{ scale: 1.2, rotate: index % 2 === 0 ? -8 : 8 }} transition={{ type: 'spring', stiffness: 300 }} />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{action.title}</h3>
-                <Link
-                  to={action.link}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Explore →
-                </Link>
-              </motion.div>
-            ))}
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h1 className="text-3xl font-light text-gray-900">
+                Hello, {getUserDisplayName()}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <BarChart className="w-6 h-6" />
+            </button>
           </div>
         </motion.div>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="w-full px-4 sm:px-8 lg:px-16">
+        <div className="max-w-[1440px] mx-auto w-full">
+          {/* Mood Check Section */}
+          <motion.div 
+            className="mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <h2 className="text-2xl font-light text-gray-900 mb-8 text-center">
+              How are you feeling today?
+            </h2>
+            <div className="flex justify-center space-x-6">
+              {moods.map((mood, index) => (
+                <motion.button
+                  key={mood.label}
+                  onClick={() => setSelectedMood(mood)}
+                  className={`group flex flex-col items-center space-y-2 p-4 rounded-2xl transition-all ${
+                    selectedMood?.label === mood.label 
+                      ? 'bg-white shadow-lg scale-105' 
+                      : 'hover:bg-white/50'
+                  }`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.1 * index }}
+                  whileHover={{ y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <span className="text-4xl">{mood.emoji}</span>
+                  <span className="text-sm text-gray-700 font-medium">{mood.label}</span>
+                </motion.button>
+              ))}
+            </div>
+            {selectedMood && (
+              <motion.div 
+                className="mt-8 text-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <p className="text-gray-600">
+                  Thank you for sharing. {selectedMood.label === 'Difficult' || selectedMood.label === 'Anxious' 
+                    ? "We're here to support you." 
+                    : "Keep nurturing your well-being."}
+                </p>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Main Action Cards - Horizontal Layout */}
+          <motion.div 
+            className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            {/* Check-in Card */}
+            <motion.div
+              className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-lg transition-all duration-300"
+              whileHover={{ y: -5 }}
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6">
+                <Heart className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Daily Check-in</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Take a moment to reflect on your emotional well-being with our guided assessment.
+              </p>
+              <Link
+                to="/survey"
+                className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors"
+              >
+                <span>Start Check-in</span>
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
+            </motion.div>
+
+            {/* Meditation Card */}
+            <motion.div
+              className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-lg transition-all duration-300"
+              whileHover={{ y: -5 }}
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mb-6">
+                <Brain className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Meditation</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Find your calm with guided meditations designed to reduce stress and anxiety.
+              </p>
+              <Link
+                to="/meditation"
+                className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium transition-colors"
+              >
+                <span>Start Session</span>
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
+            </motion.div>
+
+            {/* Sleep Stories Card */}
+            <motion.div
+              className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-lg transition-all duration-300"
+              whileHover={{ y: -5 }}
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                <Moon className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Sleep Stories</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Drift off peacefully with soothing bedtime stories and calming soundscapes.
+              </p>
+              <button
+                onClick={() => setShowBreathing(true)}
+                className="inline-flex items-center text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+              >
+                <span>Listen Tonight</span>
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </button>
+            </motion.div>
+          </motion.div>
+
+          {/* Quick Tools Grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="mb-16"
+          >
+            <h2 className="text-2xl font-light text-gray-900 mb-8">Quick Tools</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              <QuickAction 
+                icon={<Wind className="w-6 h-6" />}
+                title="Breathing"
+                link="#"
+              />
+              <QuickAction 
+                icon={<Activity className="w-6 h-6" />}
+                title="Body Scan"
+                link="/meditation"
+              />
+              <QuickAction 
+                icon={<Leaf className="w-6 h-6" />}
+                title="Nature Sounds"
+                link="/meditation"
+              />
+              <QuickAction 
+                icon={<Target className="w-6 h-6" />}
+                title="Focus Music"
+                link="/meditation"
+              />
+            </div>
+          </motion.div>
+
+          {/* Progress Summary */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-8 mb-16"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Your Wellness Journey</h3>
+                <p className="text-gray-600">You've been taking great care of yourself</p>
+              </div>
+              <Link
+                to="/dashboard"
+                className="bg-white text-gray-700 px-6 py-3 rounded-2xl font-medium hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                View Progress
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 gap-6 mt-8">
+              <div className="text-center">
+                <p className="text-3xl font-light text-gray-900">7</p>
+                <p className="text-sm text-gray-600 mt-1">Day Streak</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-light text-gray-900">23</p>
+                <p className="text-sm text-gray-600 mt-1">Sessions</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-light text-gray-900">4.5h</p>
+                <p className="text-sm text-gray-600 mt-1">Total Time</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Breathing Modal */}
+      <AnimatePresence>
+        {showBreathing && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowBreathing(false)}
+          >
+            <motion.div
+              className="bg-white rounded-3xl p-8 max-w-md w-full"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+                  <Wind className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-semibold text-gray-900 mb-4">Take a Deep Breath</h3>
+                <p className="text-gray-600 mb-8">Follow the circle as it expands and contracts</p>
+                <button
+                  onClick={() => setShowBreathing(false)}
+                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-2xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-export default HomePage; 
+// WellnessTool Component
+const WellnessTool = ({ title, icon, link, color, bgColor }) => {
+  return (
+    <Link to={link}>
+      <motion.div
+        className={`bg-gradient-to-br ${bgColor} rounded-3xl p-6 border border-white/50 hover:shadow-lg transition-all duration-300 text-center group`}
+        whileHover={{ y: -5, scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <motion.div
+          className={`w-12 h-12 bg-gradient-to-r ${color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300`}
+          whileHover={{ scale: 1.1, rotate: 5 }}
+        >
+          <div className="text-white">
+            {icon}
+          </div>
+        </motion.div>
+        <h4 className="font-semibold text-gray-900 mb-2">{title}</h4>
+        <div className="flex items-center justify-center text-sm text-gray-600 group-hover:text-gray-800 transition-colors">
+          <span>Explore</span>
+          <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </motion.div>
+    </Link>
+  );
+};
+
+// Legacy Card Component (kept for compatibility)
+const Card = ({ icon, title, description, buttonText, buttonLink, buttonStyle }) => {
+  return (
+    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col justify-between">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="text-primary-500">{icon}</div>
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+      </div>
+      <p className="text-sm text-gray-600 mb-4">{description}</p>
+      <Link
+        to={buttonLink}
+        className={`inline-block px-4 py-2 text-white text-sm font-medium rounded-lg transition ${buttonStyle}`}
+      >
+        {buttonText}
+      </Link>
+    </div>
+  );
+};
+
+// Legacy QuickAction Component (kept for compatibility)
+const QuickAction = ({ title, icon, link }) => {
+  return (
+    <Link
+      to={link}
+      className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex flex-col items-center justify-center hover:shadow-md transition"
+    >
+      <div className="mb-3 text-indigo-500">{icon}</div>
+      <h4 className="font-medium text-gray-800">{title}</h4>
+      <span className="text-xs text-gray-500 mt-1">Explore →</span>
+    </Link>
+  );
+};
+
+export default HomePage;

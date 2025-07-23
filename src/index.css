@@ -1,42 +1,108 @@
 @import '@fontsource/inter/index.css';
+@import '@fontsource/archivo/index.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for the Manova app */
 @layer base {
   html {
+    scroll-behavior: smooth;
     font-size: 90%; /* Base font size reduced by 10% */
   }
-  
+
   html, body {
-    font-family: 'InterVariable', 'Inter', 'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-weight: 400;
-    -webkit-font-smoothing: antialiased;
-    @apply bg-gray-50 text-gray-900 leading-relaxed;
+    height: 100%;
+    margin: 0;
+    padding: 0;
     overflow-x: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-neutral-50 text-neutral-900 leading-relaxed;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply text-gray-900 font-bold;
+    font-weight: 600;
+    line-height: 1.2;
   }
 
   p, span, li, label, input, button {
     @apply text-gray-600;
+    line-height: 1.6;
   }
 
-  /* Container constraints */
+  /* Container constraints - Updated for full width */
   .container {
-    @apply px-4 sm:px-6 lg:px-8 mx-auto;
-    max-width: 1440px;
+    @apply w-full px-6 lg:px-12;
   }
 
   /* Responsive spacing utilities */
   .section-padding {
     @apply py-8 sm:py-12 md:py-16;
+    padding: 4rem 0;
   }
 
   .content-padding {
     @apply px-4 sm:px-6 lg:px-8;
+    padding: 2rem 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    border: none;
+    outline: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    color: white;
+    box-shadow: 0 4px 14px 0 rgba(14, 165, 233, 0.3);
+  }
+
+  .input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s ease-in-out;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease-in-out;
+  }
+
+  /* Responsive grid layouts */
+  .responsive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+
+  /* Responsive text sizes */
+  .responsive-heading {
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    line-height: 1.2;
+  }
+
+  .responsive-text {
+    font-size: clamp(1rem, 2vw, 1.125rem);
   }
 }
 
@@ -74,62 +140,55 @@
 
 .bg-grid-pattern {
   background-image: 
-    linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-  background-size: 50px 50px;
+    linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
   background-position: center center;
 }
 
 @keyframes float-slow {
-  0% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-20px) translateX(10px); }
-  100% { transform: translateY(0) translateX(0); }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
 }
+
 @keyframes float-medium {
-  0% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-30px) translateX(-15px); }
-  100% { transform: translateY(0) translateX(0); }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
 }
+
 @keyframes float-fast {
-  0% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(25px) translateX(20px); }
-  100% { transform: translateY(0) translateX(0); }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
+
 .animate-float-slow {
-  animation: float-slow 12s ease-in-out infinite;
+  animation: float-slow 6s ease-in-out infinite;
 }
+
 .animate-float-medium {
-  animation: float-medium 8s ease-in-out infinite;
+  animation: float-medium 4s ease-in-out infinite;
 }
+
 .animate-float-fast {
-  animation: float-fast 6s ease-in-out infinite;
+  animation: float-fast 3s ease-in-out infinite;
 }
 
 .confetti-burst {
-  position: absolute;
-  top: 40px;
-  left: 50%;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 100;
+  position: relative;
+  overflow: hidden;
 }
+
 .confetti-burst::before,
 .confetti-burst::after {
   content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
 }
-.confetti-burst {
-  /* 10 confetti pieces */
-}
-.confetti-burst {
-  /* Each confetti piece is a div absolutely positioned and animated */
-}
-.confetti-burst {
-  /* Add confetti pieces via pseudo-elements or with extra divs in JSX if needed */
-}
-.confetti-burst {
-  /* For simplicity, add 10 divs in JSX with class confetti-piece and different styles */
-}
+
 .confetti-piece {
   position: absolute;
   width: 10px;
@@ -138,6 +197,7 @@
   opacity: 0.8;
   animation: confetti-fall 1.2s cubic-bezier(0.4,0,0.2,1) forwards, confetti-spin 1.2s linear infinite;
 }
+
 .confetti-piece.c1 { background: #60a5fa; left: -40px; animation-delay: 0s; }
 .confetti-piece.c2 { background: #f472b6; left: -20px; animation-delay: 0.1s; }
 .confetti-piece.c3 { background: #34d399; left: 0px; animation-delay: 0.2s; }
@@ -148,12 +208,31 @@
 .confetti-piece.c8 { background: #facc15; left: 30px; animation-delay: 0.35s; }
 .confetti-piece.c9 { background: #818cf8; left: 50px; animation-delay: 0.45s; }
 .confetti-piece.c10 { background: #f472b6; left: -50px; animation-delay: 0.05s; }
+
 @keyframes confetti-fall {
   0% { top: 0; opacity: 1; }
   80% { opacity: 1; }
   100% { top: 120px; opacity: 0; }
 }
+
 @keyframes confetti-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Text truncation utilities */
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text-truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -143,8 +143,9 @@ const ExercisePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12">
+      <div className="w-full px-4 sm:px-8 lg:px-16">
+        <div className="max-w-[1440px] mx-auto w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -315,6 +316,7 @@ const ExercisePage = () => {
             </motion.button>
           </div>
         </motion.div>
+        </div>
       </div>
     </div>
   );

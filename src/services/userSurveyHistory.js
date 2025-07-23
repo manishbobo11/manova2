@@ -69,4 +69,20 @@ export const getLastCheckin = async (userId) => {
   const q = query(checkinsColRef, orderBy('timestamp', 'desc'), limit(1));
   const snapshot = await getDocs(q);
   return snapshot.docs[0]?.data() || null;
+};
+
+// Get user check-ins using UID-based nested fetch
+export const getUserCheckins = async (uid) => {
+  try {
+    const checkinsRef = collection(doc(db, 'users', uid), 'checkins');
+    const snapshot = await getDocs(checkinsRef);
+    const checkins = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    return checkins;
+  } catch (error) {
+    console.error("❌ Error fetching check-ins for UID:", uid, error);
+    return [];
+  }
 }; 

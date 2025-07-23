@@ -20,13 +20,12 @@ const WellnessChat = ({ userId }) => {
     setUserContext(context);
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,7 +80,7 @@ const WellnessChat = ({ userId }) => {
       </div>
 
       {showContext && userContext && (
-        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+        <div className="mb-4 p-4 bg-neutral-50 rounded-lg">
           <h3 className="font-medium mb-2">Your Wellness Context</h3>
           <p>Recent Mood: {userContext.mood || 'Not recorded'}</p>
           <p>Stress Triggers: {userContext.stressTriggers?.join(', ') || 'None identified'}</p>

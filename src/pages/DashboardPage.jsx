@@ -1,946 +1,1051 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
-} from 'recharts';
-import { 
-  Activity, Brain, Heart, Shield, Zap, 
-  TrendingUp, AlertTriangle, MessageCircle, X, DollarSign, User, Phone, AlertCircle, Sparkles, Calendar
+  Sparkles, Brain, Heart, Calendar, Activity, Target, Award,
+  MessageCircle, Phone, TrendingUp, TrendingDown, AlertTriangle,
+  RefreshCw, BarChart3, Clock, Plus
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../config/firebase';
-import { collection, query, where, orderBy, limit, getDocs, onSnapshot, getDoc, doc } from 'firebase/firestore';
-import Header from '../components/Header';
-import GlassCard from '../components/GlassCard';
-
-const DOMAIN_META = {
-  work: { label: 'Work & Career', icon: Activity, color: 'from-green-400 to-green-100' },
-  personal: { label: 'Personal Life', icon: Heart, color: 'from-blue-400 to-blue-100' },
-  financial: { label: 'Financial Stress', icon: Shield, color: 'from-yellow-400 to-yellow-100' },
-  health: { label: 'Health', icon: Zap, color: 'from-teal-400 to-teal-100' },
-  identity: { label: 'Self-Worth & Identity', icon: Brain, color: 'from-purple-400 to-purple-100' },
-};
-
-const domains = [
-  { name: 'Work & Career', icon: Brain, color: 'bg-blue-500', key: 'work' },
-  { name: 'Personal Life', icon: Heart, color: 'bg-red-500', key: 'personal' },
-  { name: 'Financial Stress', icon: DollarSign, color: 'bg-green-500', key: 'financial' },
-  { name: 'Health', icon: Activity, color: 'bg-orange-500', key: 'health' },
-  { name: 'Self-Worth & Identity', icon: User, color: 'bg-purple-500', key: 'identity' },
-];
-
-const getWellnessLevel = (score) => {
-  if (score <= 25) return { level: 'Excellent', color: 'text-green-600', bg: 'bg-green-100' };
-  if (score <= 50) return { level: 'Good', color: 'text-blue-600', bg: 'bg-blue-100' };
-  if (score <= 75) return { level: 'Moderate Concern', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-  return { level: 'High Concern', color: 'text-red-600', bg: 'bg-red-100' };
-};
-
-function calculateWellnessScore(responses) {
-  const allResponses = Object.values(responses);
-  const totalPossible = allResponses.length * 4;
-  const actualScore = allResponses.reduce((sum, score) => sum + Number(score), 0);
-  const invertedScore = totalPossible - actualScore;
-  const scoreOutOf10 = Math.round((invertedScore / totalPossible) * 10);
-  return Math.max(1, scoreOutOf10);
-}
-
-function analyzeEmotionalState(responses) {
-  const domainScores = domains.map((domain) => {
-    const domainResponses = Object.entries(responses)
-      .filter(([k]) => k.startsWith(domain.key + '_'))
-      .map(([, v]) => Number(v));
-    const average = domainResponses.length > 0 ? domainResponses.reduce((sum, score) => sum + score, 0) / domainResponses.length : 0;
-    return { domain: domain.name, score: average };
-  });
-  const concerns = domainScores
-    .filter(d => d.score >= 2.5)
-    .sort((a, b) => b.score - a.score)
-    .map(d => d.domain);
-  const avgScore = domainScores.reduce((sum, d) => sum + d.score, 0) / domainScores.length;
-  let mood = 'positive';
-  if (avgScore > 3) mood = 'very stressed';
-  else if (avgScore > 2.5) mood = 'stressed';
-  else if (avgScore > 2) mood = 'moderate';
-  else if (avgScore > 1.5) mood = 'managing well';
-  return { mood, primaryConcerns: concerns, domainScores };
-}
-
-const moodForecast = 'Mood stable for next week.';
-
-// Add MCP protocol logic
-function getMCPStage(wellnessScore, sentiment) {
-  if (wellnessScore <= 3) {
-    return {
-      stage: 'Escalate',
-      message: 'High risk detected. Immediate professional support recommended.',
-      color: 'bg-red-100 text-red-700'
-    };
-  }
-  if (wellnessScore <= 6 || (sentiment.primaryConcerns && sentiment.primaryConcerns.length > 0)) {
-    return {
-      stage: 'Monitor',
-      message: 'Moderate risk. Please monitor and consider self-care or peer support.',
-      color: 'bg-yellow-100 text-yellow-700'
-    };
-  }
-  return {
-    stage: 'Self-Care',
-    message: 'You are doing well. Keep up your self-care routines!',
-    color: 'bg-green-100 text-green-700'
-  };
-}
-
-// Personalized greeting function
-function getPersonalizedGreeting(name, wellnessScore, sentiment) {
-  if (wellnessScore >= 7) {
-    return `Welcome back, ${name}! You're doing great. Keep up your self-care.`;
-  }
-  if (wellnessScore >= 5) {
-    return `Hi ${name}, remember to take some time for yourself this week.`;
-  }
-  if (wellnessScore < 5) {
-    return `Hi ${name}, we noticed you've had a tough week. We're here for you.`;
-  }
-  return `Welcome, ${name}!`;
-}
+import { getUserCheckins } from '../services/userSurveyHistory';
+import WellnessGraph from '../components/WellnessGraph';
+import SarthiChatbox from '../components/SarthiChatbox';
+import ChatHistoryWidget from '../components/ChatHistoryWidget';
+import TherapistRecommendations from '../components/TherapistRecommendations';
+import TherapistLandingSection from '../components/TherapistLandingSection';
+import { ChatSessionProvider } from '../contexts/ChatSessionContext';
 
 const DashboardPage = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  
+  // Core state
   const [loading, setLoading] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      type: 'bot',
-      message: "Hi! I'm ARIA, your AI wellness companion. How can I help you today?",
-      timestamp: new Date(),
-      avatar: '🤖'
-    }
-  ]);
-  const [newMessage, setNewMessage] = useState('');
-  const [responses, setResponses] = useState({});
-  const [wellnessScore, setWellnessScore] = useState(0);
-  const [sentiment, setSentiment] = useState({});
-  const [lastCheckinDate, setLastCheckinDate] = useState(null);
-  const [monthlyTrend, setMonthlyTrend] = useState([]);
-  const [highestStressDomain, setHighestStressDomain] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [mostCommonConcern, setMostCommonConcern] = useState(null);
-  const [responseTime, setResponseTime] = useState(null);
-  const [nextCheckin, setNextCheckin] = useState(null);
-  const [completionRate, setCompletionRate] = useState(null);
-  const [totalResponses, setTotalResponses] = useState(null);
-  const [trendPeriod, setTrendPeriod] = useState(30);
-  const [trendData, setTrendData] = useState([]);
-  const [hasProactiveChat, setHasProactiveChat] = useState(false);
-  const [deepDiveInsights, setDeepDiveInsights] = useState(null);
-  const [loadingDeepDive, setLoadingDeepDive] = useState(true);
+  const [error, setError] = useState(null);
+  const [allCheckins, setAllCheckins] = useState([]);
+  const [viewPeriod, setViewPeriod] = useState(30); // 7, 30, or 90 days
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Derived state for current wellness status
+  const [currentWellness, setCurrentWellness] = useState({
+    score: 0,
+    mood: 'neutral',
+    lastCheckinDate: null
+  });
+  
+  // Chatbot state
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [resumeSessionId, setResumeSessionId] = useState(null);
+  const newChatFunctionRef = useRef(null);
 
-  useEffect(() => {
-    if (!currentUser || !currentUser.uid) {
-      console.error('Firestore query aborted: userId is undefined', { currentUser });
-      return;
+  // Handle resuming a chat session
+  const handleResumeChat = (sessionId) => {
+    console.log('🔄 Resuming chat session:', sessionId);
+    setResumeSessionId(sessionId);
+    setShowChatbot(true);
+  };
+
+  // Daily goals (static for now as requested)
+  const dailyGoals = [
+    { id: 1, text: '10 minutes meditation', icon: Brain },
+    { id: 2, text: 'Gratitude journaling', icon: Heart },
+    { id: 3, text: '30 minutes walk', icon: Activity },
+    { id: 4, text: 'Connect with a friend', icon: MessageCircle }
+  ];
+
+  // Helper functions for wellness calculations
+  const calculateWellnessScore = (responses) => {
+    try {
+      if (!responses || Object.keys(responses).length === 0) return 0;
+      const allResponses = Object.values(responses);
+      if (allResponses.length === 0) return 0;
+      
+      const totalPossible = allResponses.length * 4;
+      const actualScore = allResponses.reduce((sum, score) => sum + Number(score || 0), 0);
+      const invertedScore = totalPossible - actualScore;
+      const scoreOutOf10 = Math.round((invertedScore / totalPossible) * 10);
+      return Math.max(1, Math.min(10, scoreOutOf10));
+    } catch (err) {
+      console.warn('Error calculating wellness score:', err);
+      return 0;
     }
-    console.log('Firestore query userId:', currentUser.uid);
-    setLoading(true);
-    const q = query(
-        collection(db, 'checkins'),
-        where('userId', '==', currentUser.uid),
-        orderBy('completedAt', 'desc'),
-        limit(1)
-      );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        setResponses(data.responses || {});
-        setLastCheckinDate(data.completedAt?.toDate());
+  };
+
+  const calculateStressScore = (responses) => {
+    try {
+      if (!responses || Object.keys(responses).length === 0) return 0;
+      const allResponses = Object.values(responses).map(v => Number(v || 0));
+      if (allResponses.length === 0) return 0;
+      
+      const avgStress = allResponses.reduce((sum, score) => sum + score, 0) / allResponses.length;
+      return Math.round(avgStress * 10) / 10;
+    } catch (err) {
+      console.warn('Error calculating stress score:', err);
+      return 0;
+    }
+  };
+
+  const analyzeMood = (responses) => {
+    try {
+      if (!responses || Object.keys(responses).length === 0) return 'neutral';
+      
+      const scores = Object.values(responses).map(v => Number(v || 0));
+      const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      
+      if (avgScore > 3) return 'very stressed';
+      if (avgScore > 2.5) return 'stressed';
+      if (avgScore > 2) return 'moderate';
+      if (avgScore > 1.5) return 'managing well';
+      return 'positive';
+    } catch (err) {
+      console.warn('Error analyzing mood:', err);
+      return 'neutral';
+    }
+  };
+
+  // Memoized calculations for performance
+  const historicalMetrics = useMemo(() => {
+    try {
+      if (!allCheckins || allCheckins.length === 0) {
+        return {
+          avgWellness: 0,
+          avgStress: 0,
+          totalCheckins: 0,
+          stabilityScore: 0,
+          checkInRate30d: 0,
+          hasData: false
+        };
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [currentUser]);
 
-  useEffect(() => {
-    if (Object.keys(responses).length === 0) return;
-    setWellnessScore(calculateWellnessScore(responses));
-    setSentiment(analyzeEmotionalState(responses));
-  }, [responses]);
+      // Calculate wellness and stress scores for all check-ins
+      const wellnessScores = allCheckins
+        .map(checkin => calculateWellnessScore(checkin.responses))
+        .filter(score => score > 0);
+      
+      const stressScores = allCheckins
+        .map(checkin => calculateStressScore(checkin.responses))
+        .filter(score => score >= 0);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!currentUser || !currentUser.uid) {
-        console.error('Firestore query aborted: userId is undefined', { currentUser });
+      // Calculate averages from ALL check-ins
+      const avgWellness = wellnessScores.length > 0 ? 
+        wellnessScores.reduce((a, b) => a + b, 0) / wellnessScores.length : 0;
+      
+      const avgStress = stressScores.length > 0 ? 
+        stressScores.reduce((a, b) => a + b, 0) / stressScores.length : 0;
+      
+      // Calculate stability (consistency) from wellness scores
+      let stabilityScore = 0;
+      if (wellnessScores.length > 1) {
+        const mean = avgWellness;
+        const variance = wellnessScores.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / wellnessScores.length;
+        stabilityScore = Math.max(0, 100 - (variance * 10));
+      } else if (wellnessScores.length === 1) {
+        stabilityScore = 100; // Perfect stability with one data point
+      }
+
+      // Calculate 30-day check-in rate
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const recent30dCheckins = allCheckins.filter(checkin => {
+        const checkinDate = checkin.timestamp?.toDate ? 
+          checkin.timestamp.toDate() : 
+          new Date(checkin.timestamp);
+        return checkinDate >= thirtyDaysAgo;
+      });
+      const checkInRate30d = Math.min(100, Math.round((recent30dCheckins.length / 30) * 100));
+
+      return {
+        avgWellness: Math.round(avgWellness * 10) / 10,
+        avgStress: Math.round(avgStress * 10) / 10,
+        totalCheckins: allCheckins.length,
+        stabilityScore: Math.round(stabilityScore),
+        checkInRate30d,
+        hasData: allCheckins.length > 0
+      };
+    } catch (err) {
+      console.warn('Error calculating historical metrics:', err);
+      return {
+        avgWellness: 0,
+        avgStress: 0,
+        totalCheckins: 0,
+        stabilityScore: 0,
+        checkInRate30d: 0,
+        hasData: false
+      };
+    }
+  }, [allCheckins]);
+
+  // Memoized filtered check-ins for view period
+  const filteredCheckins = useMemo(() => {
+    try {
+      if (!allCheckins || allCheckins.length === 0) return [];
+      
+      const now = new Date();
+      const cutoffDate = new Date(now.getTime() - viewPeriod * 24 * 60 * 60 * 1000);
+      
+      return allCheckins
+        .filter(checkin => {
+          const checkinDate = checkin.timestamp?.toDate ? 
+            checkin.timestamp.toDate() : 
+            new Date(checkin.timestamp);
+          return checkinDate >= cutoffDate;
+        })
+        .sort((a, b) => {
+          const aTime = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+          const bTime = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+          return aTime - bTime; // Ascending order for proper trend display
+        });
+    } catch (err) {
+      console.warn('Error filtering check-ins:', err);
+      return [];
+    }
+  }, [allCheckins, viewPeriod]);
+
+  // Memoized AI insights based on last N check-ins
+  const aiInsights = useMemo(() => {
+    try {
+      if (!allCheckins || allCheckins.length === 0) return null;
+      
+      // Use last 3 check-ins for insights, or all if less than 3
+      const recentCheckins = allCheckins.slice(0, Math.min(3, allCheckins.length));
+      
+      // Calculate average wellness from recent check-ins
+      const recentWellnessScores = recentCheckins
+        .map(checkin => calculateWellnessScore(checkin.responses))
+        .filter(score => score > 0);
+      
+      if (recentWellnessScores.length === 0) return null;
+      
+      const avgRecentWellness = recentWellnessScores.reduce((a, b) => a + b, 0) / recentWellnessScores.length;
+      
+      let insight = '';
+      let recommendations = [];
+      
+      if (avgRecentWellness >= 8) {
+        insight = "Your recent check-ins show excellent mental wellness! You're demonstrating strong emotional resilience and effective stress management strategies.";
+        recommendations = ['Mindfulness', 'Social Connection', 'Maintain Routine'];
+      } else if (avgRecentWellness >= 6) {
+        insight = "Your wellness scores are in a good range. Your recent patterns suggest you're managing well overall, with some minor areas for growth.";
+        recommendations = ['Exercise', 'Sleep Hygiene', 'Stress Management'];
+      } else if (avgRecentWellness >= 4) {
+        insight = "Your recent responses indicate some areas that could benefit from focused attention. Consider implementing structured self-care routines.";
+        recommendations = ['Mindfulness', 'Exercise', 'Social Connection', 'Professional Support'];
+      } else {
+        insight = "Your recent check-ins indicate significant stress levels. It's important to prioritize your mental health and consider professional support.";
+        recommendations = ['Professional Support', 'Crisis Resources', 'Mindfulness', 'Social Connection'];
+      }
+      
+      return {
+        insight,
+        recommendations,
+        basedOnCheckins: recentCheckins.length,
+        avgScore: Math.round(avgRecentWellness * 10) / 10
+      };
+    } catch (err) {
+      console.warn('Error generating AI insights:', err);
+      return null;
+    }
+  }, [allCheckins]);
+
+  // User display helpers
+  const getUserDisplayName = () => {
+    if (currentUser?.displayName) return currentUser.displayName;
+    if (currentUser?.email) {
+      const emailName = currentUser.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    return 'User';
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    const userName = getUserDisplayName();
+    if (hour < 12) return `Good morning, ${userName}! ☀️`;
+    if (hour < 17) return `Good afternoon, ${userName}! 🌤️`;
+    return `Good evening, ${userName}! 🌙`;
+  };
+
+  // Load full check-in array from Firestore
+  const loadAllCheckins = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (!currentUser?.uid) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('📊 Loading full check-in history for user:', currentUser.uid);
+      
+      const checkinsData = await getUserCheckins(currentUser.uid);
+      
+      if (!Array.isArray(checkinsData)) {
+        console.warn('Invalid check-ins data format:', checkinsData);
+        setAllCheckins([]);
         return;
       }
-      console.log('Firestore query userId:', currentUser.uid);
-      try {
-        // Fetch last 5 check-ins for trend data
-        const checkinQuery = query(
-          collection(db, 'checkins'),
-          where('userId', '==', currentUser.uid),
-          orderBy('completedAt', 'desc'),
-          limit(5)
-        );
-        
-        const snapshot = await getDocs(checkinQuery);
-        const docs = snapshot.docs.map(doc => doc.data());
-        
-        if (docs.length > 0) {
-          // Process domain scores from latest check-in
-          const latestResponses = docs[0].responses || {};
-          const scores = {};
-          let highestScore = 0;
-          let highestDomain = null;
+
+      // Sort check-ins by timestamp (newest first)
+      const sortedCheckins = checkinsData.sort((a, b) => {
+        const aTime = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+        const bTime = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+        return bTime - aTime;
+      });
+
+      setAllCheckins(sortedCheckins);
+      console.log(`✅ Loaded ${sortedCheckins.length} total check-ins`);
+
+      // Set current wellness state from latest check-in
+      if (sortedCheckins.length > 0) {
+        const latestCheckin = sortedCheckins[0];
+        if (latestCheckin.responses) {
+          const score = calculateWellnessScore(latestCheckin.responses);
+          const mood = analyzeMood(latestCheckin.responses);
+          const lastDate = latestCheckin.timestamp?.toDate ? 
+            latestCheckin.timestamp.toDate() : 
+            new Date(latestCheckin.timestamp);
           
-          Object.keys(DOMAIN_META).forEach(domain => {
-            const values = Object.entries(latestResponses)
-              .filter(([key]) => key.startsWith(domain + '_'))
-              .map(([, value]) => Number(value));
-              
-            if (values.length > 0) {
-              const avg = values.reduce((a, b) => a + b, 0) / values.length;
-              const score = Math.round(avg * 20); // Convert 1-5 scale to 0-100%
-              scores[domain] = score;
-              
-              if (score > highestScore) {
-                highestScore = score;
-                highestDomain = domain;
-              }
-            } else {
-              scores[domain] = 0;
-            }
+          setCurrentWellness({
+            score,
+            mood,
+            lastCheckinDate: lastDate
           });
-          
-          setHighestStressDomain(highestDomain);
-          
-          // Prepare trend data
-          const trend = docs.map((data, idx) => {
-            const responses = data.responses || {};
-            let sum = 0, count = 0;
-            
-            Object.keys(DOMAIN_META).forEach(domain => {
-              const values = Object.entries(responses)
-                .filter(([key]) => key.startsWith(domain + '_'))
-                .map(([, value]) => Number(value));
-                
-              if (values.length > 0) {
-                const avg = values.reduce((a, b) => a + b, 0) / values.length;
-                sum += avg * 20;
-                count++;
-              }
-            });
-            
-            const wellnessScore = count ? 10 - (sum / count) / 10 : 0;
-            
-          return {
-            name: `Check-in ${docs.length - idx}`,
-              wellness: wellnessScore,
-              date: data.completedAt?.toDate().toLocaleDateString(),
-          };
-        }).reverse();
-          
-          setMonthlyTrend(trend);
         }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
+      } else {
+        setCurrentWellness({
+          score: 0,
+          mood: 'neutral',
+          lastCheckinDate: null
+        });
       }
-    };
-
-    fetchDashboardData();
-  }, [currentUser]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser || !currentUser.uid) {
-      console.error('Firestore query aborted: userId is undefined', { currentUser });
-      return;
+    } catch (err) {
+      console.error('Error loading check-ins:', err);
+      setError(err.message);
+      setAllCheckins([]);
+    } finally {
+      setLoading(false);
     }
-    console.log('Firestore query userId:', currentUser.uid);
-    const fetchMonthlyCheckins = async () => {
-      const now = new Date();
-      const monthAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
-      const q = query(
-        collection(db, 'checkins'),
-        where('userId', '==', currentUser.uid),
-        orderBy('completedAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs
-        .map(doc => doc.data())
-        .filter(doc => doc.completedAt && doc.completedAt.toDate() >= monthAgo)
-        .sort((a, b) => a.completedAt.toDate() - b.completedAt.toDate());
-      const trend = docs.map((doc, idx) => ({
-        date: doc.completedAt?.toDate().toLocaleDateString(),
-        wellness: calculateWellnessScore(doc.responses || {})
-      }));
-      setMonthlyTrend(trend);
-    };
-    fetchMonthlyCheckins();
-  }, [currentUser, responses]);
-
-  useEffect(() => {
-    if (!currentUser || !currentUser.uid) {
-      console.error('Firestore query aborted: userId is undefined', { currentUser });
-      return;
-    }
-    console.log('Firestore query userId:', currentUser.uid);
-    const fetchTrendData = async () => {
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - trendPeriod);
-      const q = query(
-        collection(db, 'checkins'),
-        where('userId', '==', currentUser.uid),
-        orderBy('completedAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs
-        .map(doc => doc.data())
-        .filter(doc => doc.completedAt && doc.completedAt.toDate() >= startDate)
-        .sort((a, b) => a.completedAt.toDate() - b.completedAt.toDate());
-      const trend = docs.map(doc => ({
-        date: doc.completedAt?.toDate().toLocaleDateString(),
-        wellness: calculateWellnessScore(doc.responses || {})
-      }));
-      setTrendData(trend);
-    };
-    fetchTrendData();
-  }, [currentUser, trendPeriod]);
-
-  const calculateDomainScore = (domainKey) => {
-    const domain = domains.find(d => d.key === domainKey);
-    const domainResponses = Object.entries(responses)
-      .filter(([k]) => k.startsWith(domainKey + '_'))
-      .map(([, v]) => Number(v));
-    const average = domainResponses.length > 0 ? domainResponses.reduce((sum, score) => sum + score, 0) / domainResponses.length : 0;
-    return Math.round(average * 25); // Convert to percentage
   };
 
-  const wellnessLevel = getWellnessLevel(wellnessScore);
-
-  // Extract username from email
-  const username = currentUser?.email ? 
-    currentUser.email.split('@')[0].replace(/\./g, ' ') : 'User';
-
-  const userData = {
-    name: username.charAt(0).toUpperCase() + username.slice(1),
-    avatar: username.split(' ').map(n => n[0]).join('').toUpperCase()
-  };
-
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  // Calculate next check-in date
+  const getNextCheckinInfo = () => {
+    if (!currentWellness.lastCheckinDate) return { daysUntil: 0, message: 'Ready now' };
     
-    const userMessage = { 
-      type: 'user', 
-      message: newMessage, 
-      timestamp: new Date(), 
-      avatar: '👤' 
-    };
+    const nextDate = new Date(currentWellness.lastCheckinDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const daysUntil = Math.max(0, Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24)));
     
-    setChatMessages(prev => [...prev, userMessage]);
-    setNewMessage('');
-
-    // Simulate ARIA's response
-    setTimeout(() => {
-      const botResponse = {
-        type: 'bot',
-        message: "I understand your concerns. Let me help you with some personalized strategies. What's your immediate priority right now?",
-        timestamp: new Date(),
-        avatar: '🤖'
-      };
-      setChatMessages(prev => [...prev, botResponse]);
-    }, 1000);
+    return {
+      daysUntil,
+      message: daysUntil > 0 ? 'Stay consistent!' : 'Ready now'
+    };
   };
 
+  const nextCheckinInfo = getNextCheckinInfo();
+
+  // Load data on component mount
   useEffect(() => {
-    if (sentiment.primaryConcerns && sentiment.primaryConcerns.length > 0) {
-      setMostCommonConcern(sentiment.primaryConcerns[0]);
-    }
-  }, [sentiment]);
+    loadAllCheckins();
+  }, [currentUser?.uid]);
 
-  useEffect(() => {
-    if (lastCheckinDate) {
-      const responseTimeMs = new Date() - lastCheckinDate;
-      const responseTimeMinutes = responseTimeMs / (1000 * 60);
-      setResponseTime(responseTimeMinutes.toFixed(2));
-    }
-  }, [lastCheckinDate]);
-
-  useEffect(() => {
-    if (lastCheckinDate) {
-      const nextCheckinDate = new Date(lastCheckinDate);
-      nextCheckinDate.setDate(nextCheckinDate.getDate() + 7);
-      const nextCheckinMs = nextCheckinDate - new Date();
-      const nextCheckinMinutes = nextCheckinMs / (1000 * 60);
-      setNextCheckin(nextCheckinMinutes.toFixed(2));
-    }
-  }, [lastCheckinDate]);
-
-  useEffect(() => {
-    if (responses) {
-      const completionRate = (Object.keys(responses).length / 20) * 100;
-      setCompletionRate(completionRate.toFixed(2));
-    }
-  }, [responses]);
-
-  useEffect(() => {
-    if (responses) {
-      const totalResponses = Object.keys(responses).length;
-      setTotalResponses(totalResponses);
-    }
-  }, [responses]);
-
-  const stressLevelLabel = wellnessScore >= 7 ? 'low' : (wellnessScore >= 5 ? 'moderate' : 'high');
-
-  // Add MCP protocol logic
-  const mcp = getMCPStage(wellnessScore, sentiment);
-
-  // MCP-based proactive chatbot engagement
-  useEffect(() => {
-    if (!sentiment.mood || hasProactiveChat) return;
-    if (sentiment.mood === 'very stressed' || sentiment.mood === 'stressed') {
-      setTimeout(() => {
-        setChatOpen(true);
-        setChatMessages(prev => [
-          ...prev,
-          {
-            type: 'bot',
-            message: `Hi ${userData.name}, I noticed you've been feeling ${sentiment.mood}. Would you like to talk or try a relaxation exercise?`,
-            timestamp: new Date(),
-            avatar: '🤖'
-          }
-        ]);
-        setHasProactiveChat(true);
-      }, 2000);
-    } else if (sentiment.mood === 'positive') {
-      setTimeout(() => {
-        setChatOpen(true);
-        setChatMessages(prev => [
-          ...prev,
-          {
-            type: 'bot',
-            message: `Keep up the great work, ${userData.name}! Want a new wellness tip?`,
-            timestamp: new Date(),
-            avatar: '🤖'
-          }
-        ]);
-        setHasProactiveChat(true);
-      }, 2000);
-    }
-  }, [sentiment.mood, userData.name, hasProactiveChat]);
-
-  // Personalized greeting
-  const greeting = getPersonalizedGreeting(userData.name, wellnessScore, sentiment);
-
-  useEffect(() => {
-    const fetchDeepDiveInsights = async () => {
-      if (!currentUser || !currentUser.uid) return;
-      setLoadingDeepDive(true);
-      try {
-        const insights = {};
-        for (const d of domains) {
-          const ref = doc(db, `users/${currentUser.uid}/deep_dive_insights/${d.name}`);
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            insights[d.name] = snap.data();
-          }
-        }
-        setDeepDiveInsights(insights);
-      } catch (e) {
-        setDeepDiveInsights({});
-      } finally {
-        setLoadingDeepDive(false);
-      }
+  // Mood emoji mapping
+  const getMoodEmoji = (mood) => {
+    const emojiMap = {
+      'very stressed': '😰',
+      'stressed': '😟',
+      'moderate': '😐',
+      'managing well': '🙂',
+      'positive': '😊',
+      'neutral': '😐'
     };
-    fetchDeepDiveInsights();
-  }, [currentUser]);
+    return emojiMap[mood] || '😐';
+  };
 
+  // Emotion-matching accent colors
+  const getWellnessColors = (score, mood) => {
+    if (score >= 8 || mood === 'positive' || mood === 'managing well') {
+      return 'from-emerald-500 to-teal-600'; // Green for positive
+    } else if (score >= 6 || mood === 'moderate') {
+      return 'from-amber-500 to-orange-600'; // Orange for moderate
+    } else if (mood === 'stressed' || mood === 'very stressed') {
+      return 'from-rose-500 to-red-600'; // Red for stressed
+    } else {
+      return 'from-slate-500 to-gray-600'; // Gray for neutral/tired
+    }
+  };
+
+  // Premium Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Premium 3D Background Layers */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
+        
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
+        </div>
+        
+        {/* Main content with backdrop blur */}
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <motion.div 
+            className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 text-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <motion.div 
+              className="relative w-20 h-20 mx-auto mb-8"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              <div className="absolute inset-0 rounded-full border-4 border-blue-200/50"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            </motion.div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">Loading your wellness dashboard...</h2>
+            <p className="text-gray-700 font-medium">Analyzing your complete check-in history</p>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center pt-8 pb-8 px-4">
-      {/* Glassmorphism Header */}
-      <header className="w-full bg-gradient-to-r from-blue-500/60 to-blue-300/40 backdrop-blur-xl shadow-lg sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-          <motion.div initial={{ rotate: 0 }} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 8, ease: 'linear' }} className="flex items-center space-x-2">
-            <Sparkles className="w-8 h-8 text-blue-600" />
-            <span className="text-2xl font-bold text-blue-900 tracking-tight">Manova</span>
+  // Premium Error state
+  if (error) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Premium 3D Background Layers */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
+        
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
+        </div>
+        
+        {/* Main content with backdrop blur */}
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <motion.div 
+            className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 text-center max-w-md mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-red-400 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <AlertTriangle className="h-10 w-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-red-900 to-pink-900 bg-clip-text text-transparent mb-4">Unable to load dashboard</h2>
+            <p className="text-gray-700 mb-6 font-medium">{error}</p>
+            <motion.button 
+              onClick={loadAllCheckins}
+              className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 flex items-center space-x-3 mx-auto font-bold shadow-lg hover:shadow-xl"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <RefreshCw className="w-5 h-5" />
+              <span>Try Again</span>
+            </motion.button>
           </motion.div>
-          <nav className="flex space-x-4">
-            <button className="px-4 py-2 rounded-full bg-white/60 text-blue-700 font-semibold shadow hover:bg-blue-100 transition">Dashboard</button>
-            <button className="px-4 py-2 rounded-full bg-white/60 text-blue-700 font-semibold shadow hover:bg-blue-100 transition">Survey</button>
-            <button className="px-4 py-2 rounded-full bg-white/60 text-blue-700 font-semibold shadow hover:bg-blue-100 transition">Therapists</button>
-          </nav>
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center text-blue-900 font-bold text-lg shadow">{userData.avatar}</div>
-          </div>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      {/* Personalized Greeting */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-        className="w-full max-w-3xl mx-auto mt-8 mb-4 text-center"
-      >
-        <h1 className="text-3xl md:text-4xl font-bold text-blue-900 mb-2">{greeting}</h1>
-      </motion.div>
-
-      {/* Adaptive Dashboard Content */}
-      {wellnessScore < 5 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="bg-red-100 p-4 rounded-lg mb-4 max-w-2xl w-full text-center"
-        >
-          <h3 className="text-red-700 font-bold mb-2">You may benefit from extra support</h3>
-          <button onClick={() => navigate('/therapists')} className="btn bg-red-600 text-white">Connect with a Therapist</button>
-          <button onClick={() => navigate('/meditation')} className="btn bg-indigo-600 text-white ml-2">Try a Guided Meditation</button>
-        </motion.div>
-      )}
-      {wellnessScore >= 5 && wellnessScore < 7 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="bg-yellow-100 p-4 rounded-lg mb-4 max-w-2xl w-full text-center"
-        >
-          <h3 className="text-yellow-700 font-bold mb-2">Self-care suggestions</h3>
-          <ul className="list-disc ml-5 text-yellow-800 text-left inline-block">
-            <li>Take a short walk outdoors</li>
-            <li>Check in with a friend</li>
-            <li>Try a breathing exercise</li>
-          </ul>
-        </motion.div>
-      )}
-      {wellnessScore >= 7 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="bg-green-100 p-4 rounded-lg mb-4 max-w-2xl w-full text-center"
-        >
-          <h3 className="text-green-700 font-bold mb-2">Keep up the good work!</h3>
-          <p>Explore new wellness articles or set a new goal.</p>
-          <button onClick={() => navigate('/articles')} className="btn bg-blue-600 text-white mt-2">Explore Articles</button>
-        </motion.div>
-      )}
-
-      {/* Hero Section */}
-      <section className="w-full bg-gradient-to-br from-blue-50 to-blue-100 py-10 px-4 flex flex-col items-center">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-8 mb-8">
-          <div className="flex flex-col items-center mb-4">
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} className={`w-32 h-32 rounded-full flex items-center justify-center mb-2 ${wellnessScore >= 7 ? 'bg-blue-100' : wellnessScore >= 5 ? 'bg-yellow-100' : 'bg-red-100'}`}> 
-              <span className={`text-5xl font-bold ${wellnessScore >= 7 ? 'text-blue-600' : wellnessScore >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{wellnessScore}</span>
-              <span className="text-2xl text-blue-700">/10</span>
-            </motion.div>
-            <span className="text-lg text-blue-900 font-semibold">Your Bi-Weekly Wellness Score</span>
-            <p className="text-blue-700 mt-2 text-center">{wellnessScore >= 7 ? "You're doing great! Keep up the good work." : wellnessScore >= 5 ? "You're managing, but there's room for improvement." : "You may benefit from additional support and self-care."}</p>
-          </div>
-          {/* Key Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mt-6">
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.03 }} transition={{ duration: 0.5, delay: 0.1 * 0 }} className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-xl">
-              <span className="text-xs text-blue-500 font-semibold mb-1">Last Check-in</span>
-              <span className="text-lg font-bold text-blue-900">{lastCheckinDate ? lastCheckinDate.toLocaleDateString() : '--'}</span>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.03 }} transition={{ duration: 0.5, delay: 0.1 * 1 }} className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-xl">
-              <span className="text-xs text-blue-500 font-semibold mb-1">Total Responses</span>
-              <span className="text-lg font-bold text-blue-900">{totalResponses || '--'}</span>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.03 }} transition={{ duration: 0.5, delay: 0.1 * 2 }} className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-xl">
-              <span className="text-xs text-blue-500 font-semibold mb-1">Completion Rate</span>
-              <span className="text-lg font-bold text-blue-900">{completionRate || '--'}%</span>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.03 }} transition={{ duration: 0.5, delay: 0.1 * 3 }} className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-xl">
-              <span className="text-xs text-blue-500 font-semibold mb-1">Next Check-in</span>
-              <span className="text-lg font-bold text-blue-900">{nextCheckin || '--'}</span>
-            </motion.div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* Main Card Section */}
-      <div className="w-full max-w-5xl mx-auto mb-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-100 flex flex-col md:flex-row md:items-center md:justify-between">
-          {/* Wellness Score */}
-          <div className="flex-1 flex flex-col items-center md:items-start mb-6 md:mb-0">
-            <div className="text-4xl font-bold text-blue-700 mb-2">{wellnessScore}/10</div>
-            <div className="text-sm text-gray-500 mb-2">Wellness Score</div>
-            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${wellnessScore >= 7 ? 'bg-green-100 text-green-700' : wellnessScore >= 5 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{wellnessScore >= 7 ? 'Low Stress' : wellnessScore >= 5 ? 'Moderate Stress' : 'High Stress'}</span>
-          </div>
-          {/* Most Common Concern */}
-          <div className="flex-1 flex flex-col items-center md:items-start mb-6 md:mb-0">
-            <div className="text-sm text-gray-500 mb-1">Most Common Concern</div>
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-semibold text-red-600">{mostCommonConcern || '--'}</span>
-              {mostCommonConcern && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">High Priority</span>}
-            </div>
-          </div>
-          {/* Key Metrics */}
-          <div className="flex-1 flex flex-col items-center md:items-start">
-            <div className="text-sm text-gray-500 mb-1">Key Metrics</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-blue-700">{responseTime || '--'}</span>
-                <span className="text-xs text-gray-500">Response Time</span>
-                </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-blue-700">{nextCheckin || '--'}</span>
-                <span className="text-xs text-gray-500">Next Check-in</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-blue-700">{completionRate || '--'}%</span>
-                <span className="text-xs text-gray-500">Completion Rate</span>
-                  </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-blue-700">{totalResponses || '--'}</span>
-                <span className="text-xs text-gray-500">Total Responses</span>
-              </div>
-            </div>
-          </div>
+  // Premium Empty state - no check-ins
+  if (!historicalMetrics.hasData) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Premium 3D Background Layers */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
+        
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
         </div>
-                </div>
-
-      {/* Trends Section */}
-      <div className="w-full max-w-5xl mx-auto mb-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-blue-700">Stress Level Trends</h2>
-            <div className="flex space-x-2">
-                <button 
-                className={`px-3 py-1 rounded-lg text-sm font-medium border ${trendPeriod === 30 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200'}`}
-                onClick={() => setTrendPeriod(30)}
-                >
-                30 Days
-                </button>
-              <button 
-                className={`px-3 py-1 rounded-lg text-sm font-medium border ${trendPeriod === 90 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200'}`}
-                onClick={() => setTrendPeriod(90)}
+        
+        {/* Main content with backdrop blur */}
+        <div className="relative z-10 w-full px-4 sm:px-8 lg:px-16 py-8">
+          <div className="max-w-7xl mx-auto">
+            <motion.div 
+              className="flex justify-between items-start mb-12"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="backdrop-blur-lg bg-white/40 rounded-3xl p-6 shadow-xl border border-white/20">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-3">{getGreeting()}</h1>
+                <p className="text-gray-700 font-medium">{new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
+              </div>
+              <motion.button 
+                onClick={loadAllCheckins}
+                className="backdrop-blur-lg bg-white/40 text-gray-700 px-6 py-3 rounded-2xl border border-white/20 hover:bg-white/60 transition-all duration-300 flex items-center space-x-3 shadow-xl hover:shadow-2xl"
+                disabled={loading}
+                whileHover={{ scale: 1.05, rotateY: 5 }}
+                whileTap={{ scale: 0.95 }}
               >
-                90 Days
-              </button>
-            </div>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis domain={[0, 10]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="wellness" stroke="#4fc3f7" strokeWidth={3} name="Wellness Score" dot={{ fill: '#4fc3f7', r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                <span className="font-medium">Refresh</span>
+              </motion.button>
+            </motion.div>
 
-      {/* Analysis Summary Section */}
-      <div className={`w-full max-w-5xl mx-auto mb-8 rounded-2xl shadow-lg p-6 border border-blue-100 ${mcp.color}`}>
-        <h3 className="text-lg font-bold mb-2">MCP Protocol Stage: {mcp.stage}</h3>
-        <p>{mcp.message}</p>
-      </div>
-
-      {/* Emotional State Analysis Section */}
-      <div className="w-full max-w-5xl mx-auto mb-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-100">
-          <h3 className="text-lg font-semibold text-blue-700 mb-2">Current Analysis</h3>
-          <div className="mb-2 text-gray-700">
-            <span className="font-medium">Current mood:</span> <span className="capitalize">{sentiment.mood || '--'}</span>
-          </div>
-          {sentiment.primaryConcerns && sentiment.primaryConcerns.length > 0 && (
-            <div className="mb-2 text-gray-700">
-              <span className="font-medium">Primary areas of concern:</span> {sentiment.primaryConcerns.join(', ')}
-            </div>
-          )}
-          {(!sentiment.primaryConcerns || sentiment.primaryConcerns.length === 0) && (
-            <div className="mb-2 text-gray-500">No major concerns detected.</div>
-          )}
-          </div>
-        </div>
-
-        {/* Detailed Stress Analysis Section */}
-        <div className="w-full max-w-5xl mx-auto mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-blue-100">
-            <h2 className="text-2xl font-bold text-blue-900 mb-6">Detailed Stress Analysis</h2>
-            {loadingDeepDive ? (
-              <div className="text-blue-600">Loading insights...</div>
-            ) : deepDiveInsights && Object.keys(deepDiveInsights).length > 0 ? (
-              Object.entries(deepDiveInsights).map(([domain, insight]) => {
-                const meta = domains.find(d => d.name === domain);
-                return (
-                  <div key={domain} className="mb-8 border-b pb-6 last:border-b-0 last:pb-0">
-                    <div className="flex items-center mb-2">
-                      {meta && <meta.icon className={`w-6 h-6 mr-2 ${meta.color}`} />}
-                      <span className="text-lg font-semibold text-gray-800 mr-3">{domain}</span>
-                      {insight.rootEmotion && (
-                        <span className="inline-block bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium mr-2">{insight.rootEmotion}</span>
-                      )}
-                      {insight.updatedAt && (
-                        <span className="text-xs text-gray-400 ml-auto">{new Date(insight.updatedAt).toLocaleString()}</span>
-                      )}
-                    </div>
-                    {insight.reasons && insight.reasons.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        {insight.reasons.map((r, i) => (
-                          <span key={i} className="inline-block bg-blue-50 text-blue-800 px-2 py-1 rounded text-xs">{r}</span>
-                        ))}
-                      </div>
-                    )}
-                    {insight.customText && (
-                      <div className="bg-gray-50 border-l-4 border-blue-300 p-4 rounded mb-2 mt-2">
-                        <div className="italic text-gray-700 mb-1">"{insight.customText}"</div>
-                        <div className="flex flex-wrap gap-2 text-xs mt-1">
-                          {insight.sentiment && (
-                            <span className={`px-2 py-1 rounded-full font-medium ${insight.sentiment === 'Negative' ? 'bg-red-100 text-red-700' : insight.sentiment === 'Positive' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{insight.sentiment}</span>
-                          )}
-                          {insight.emotion && (
-                            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">{insight.emotion}</span>
-                          )}
-                          {insight.tags && Array.isArray(insight.tags) && insight.tags.map((tag, i) => (
-                            <span key={i} className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{tag}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+            <motion.div
+              className="max-w-2xl mx-auto text-center py-20"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <motion.div 
+                className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 relative overflow-hidden group"
+                whileHover={{ y: -4, scale: 1.01 }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-3xl"></div>
+                <div className="relative z-10">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                    <Brain className="h-10 w-10 text-white" />
                   </div>
-                );
-              })
-            ) : (
-              <div className="text-gray-500">No detailed stress analysis available yet.</div>
-            )}
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-6">Start your wellness journey</h2>
+                  <p className="text-gray-700 mb-8 text-lg leading-relaxed">
+                    Complete your first check-in to track your wellness progress and get personalized insights.
+                  </p>
+                  <motion.button
+                    onClick={() => navigate('/survey')}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Take Your First Check-in
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Main Content Grid */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Domain Analysis */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Domain Cards */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Domain Analysis</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {domains.map((domain, index) => {
-                  const score = calculateDomainScore(domain.key);
-                  const wellness = getWellnessLevel(score);
-                  const Icon = domain.icon;
-                  return (
-                    <GlassCard
-                      key={domain.key}
-                      icon={Icon}
-                      title={domain.name}
-                      value={`${score}%`}
-                      status={wellness.level}
-                      accent={domain.color.replace('bg-', 'from-').replace('500', '400') + ' to-blue-200'}
-                      className="h-full"
-                    >
-                      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${score}%` }}
-                          transition={{ duration: 1, ease: 'easeOut' }}
-                          className={`h-2 rounded-full ${score <= 25 ? 'bg-green-500' : score <= 50 ? 'bg-blue-500' : score <= 75 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                        />
-                      </div>
-                    </GlassCard>
-                  );
-                })}
+  // Main dashboard with data - Full Screen Professional Design
+  return (
+    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#edf4ff] via-[#fef9ff] to-[#e7fdf4] font-inter text-gray-800">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-r from-purple-300/15 to-indigo-300/15 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-10 right-10 w-80 h-80 bg-gradient-to-r from-teal-300/15 to-cyan-300/15 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-gradient-to-r from-lavender-300/15 to-sky-300/15 rounded-full blur-3xl"></div>
+      </div>
+      
+      {/* Full screen container */}
+      <div className="relative z-10 w-full h-screen flex flex-col">
+        {/* Fixed header bar */}
+        <div className="flex-shrink-0 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-lg">
+          <div className="w-full px-6 lg:px-8 py-4">
+            <motion.div 
+              className="flex justify-between items-center"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div>
+                <h1 className="text-2xl font-semibold bg-gradient-to-r from-indigo-800 to-purple-700 bg-clip-text text-transparent font-inter">{getGreeting()}</h1>
+                <p className="text-sm text-gray-600 mt-1">{new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}</p>
               </div>
-            </div>
-
-            {/* Trend Chart */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Wellness Trends</h3>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 10]} />
-                  <Tooltip />
-                    <Line 
-                      type="monotone" 
-                      dataKey="wellness" 
-                      stroke="#4fc3f7" 
-                      strokeWidth={3} 
-                      name="Wellness Score" 
-                      dot={{ fill: '#4fc3f7', r: 4 }} 
-                    />
-                </LineChart>
-              </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Actions */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-4">
-                <button
-                  onClick={() => navigate('/survey')}
-                  className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Take Survey Again</span>
-                </button>
-                
-                {wellnessScore < 5 && (
-                  <button
-                    onClick={() => navigate('/therapists')}
-                    className="w-full bg-red-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
-                  >
-                    <AlertCircle className="w-5 h-5" />
-                    <span>Consult a Therapist</span>
-                  </button>
+              <div className="flex items-center space-x-4">
+                {currentWellness.lastCheckinDate && (
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Last check-in</p>
+                    <p className="text-sm font-medium text-gray-700 flex items-center">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {currentWellness.lastCheckinDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
                 )}
                 
-                <button
-                  onClick={() => setChatOpen(true)}
-                  className="w-full bg-purple-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2"
+                {/* Theme Toggle */}
+                <motion.button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="p-2 rounded-xl bg-white/60 backdrop-blur-sm border border-white/30 hover:bg-white/80 transition-all duration-200 shadow-sm hover:shadow-md"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                 >
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Chat with ARIA</span>
-                </button>
-              </div>
-            </div>
+                  {isDarkMode ? (
+                    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                    </svg>
+                  )}
+                </motion.button>
 
-            {/* Last Check-in Info */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Last Check-in</h3>
-              {lastCheckinDate && (
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Date</span>
-                    <span className="font-medium text-gray-900">
-                      {lastCheckinDate.toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Time</span>
-                    <span className="font-medium text-gray-900">
-                      {lastCheckinDate.toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="pt-3 border-t">
-                    <button
-                      onClick={() => navigate('/survey')}
-                      className="w-full text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                      Take New Survey →
-                    </button>
-                </div>
-                </div>
-              )}
-            </div>
+                <motion.button 
+                  onClick={loadAllCheckins}
+                  className="bg-white/90 text-gray-700 px-4 py-2 rounded-xl border border-gray-200 hover:bg-white transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md hover:scale-105"
+                  disabled={loading}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="text-sm font-medium">Refresh</span>
+                </motion.button>
+              </div>
+            </motion.div>
           </div>
         </div>
-      </div>
 
-      {/* Floating Action Button for ARIA Chat */}
-      {!chatOpen && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 1 }}
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-full shadow-lg p-4 flex items-center justify-center hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 animate-pulse"
-          aria-label="Open ARIA Chat"
-        >
-          <MessageCircle className="w-7 h-7" />
-        </motion.button>
-      )}
-
-      {/* ARIA Chat Modal */}
-      <AnimatePresence>
-        {chatOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50"
-          >
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              className="bg-white/90 backdrop-blur-xl w-full md:w-96 h-[500px] md:rounded-2xl shadow-2xl flex flex-col"
-            >
-              <div className="bg-gradient-to-r from-blue-600 to-blue-400 text-white p-4 md:rounded-t-2xl flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
-                    <span className="text-lg">🤖</span>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-6">
+            
+            {/* Top Row - 4 Summary Cards */}
+            <div className="grid grid-cols-12 gap-6 mb-6">
+              {/* Current Wellness Score */}
+              <motion.div 
+                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
+                whileHover={{ y: -3, scale: 1.01 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 bg-gradient-to-br ${getWellnessColors(currentWellness.score, currentWellness.mood)} rounded-xl flex items-center justify-center shadow-sm`}>
+                    <Sparkles className="w-6 h-6 text-white" />
                   </div>
-                  <div>
-                    <h3 className="font-bold">ARIA</h3>
-                    <p className="text-blue-100 text-xs">AI Wellness Coach</p>
-                  </div>
+                  <span className="text-3xl font-bold text-neutral-900">{currentWellness.score}/10</span>
                 </div>
-                <button onClick={() => setChatOpen(false)} className="text-blue-100 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-                {chatMessages.map((msg, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: msg.type === 'user' ? 40 : -40 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.05 * index }}
-                    className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-xs flex items-start space-x-2 ${msg.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                      <div className="w-6 h-6 rounded-full bg-blue-200 flex items-center justify-center text-xs text-blue-900">
-                        {msg.avatar}
+                <h3 className="font-semibold text-gray-700 mb-2">Wellness Score</h3>
+                <p className="text-sm text-gray-600">
+                  {currentWellness.score >= 8 ? 'Excellent state' : 
+                   currentWellness.score >= 6 ? 'Good wellness' : 
+                   currentWellness.score >= 4 ? 'Needs attention' : 'Seek support'}
+                </p>
+              </motion.div>
+
+              {/* Current Mood */}
+              <motion.div 
+                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
+                whileHover={{ y: -3, scale: 1.01 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 bg-gradient-to-br ${getWellnessColors(currentWellness.score, currentWellness.mood)} rounded-xl flex items-center justify-center shadow-sm`}>
+                    <Heart className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-3xl">{getMoodEmoji(currentWellness.mood)}</span>
+                </div>
+                <h3 className="font-semibold text-gray-700 mb-2">Current Mood</h3>
+                <p className="text-sm text-gray-600 capitalize">
+                  {currentWellness.mood.replace('_', ' ')}
+                </p>
+              </motion.div>
+
+              {/* Check-in Rate */}
+              <motion.div 
+                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
+                whileHover={{ y: -3, scale: 1.01 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-3xl font-bold text-neutral-900">{historicalMetrics.checkInRate30d}%</span>
+                </div>
+                <h3 className="font-semibold text-gray-700 mb-2">Check-in Rate</h3>
+                <p className="text-sm text-gray-600">Last 30 days</p>
+              </motion.div>
+
+              {/* Next Check-in */}
+              <motion.div 
+                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
+                whileHover={{ y: -3, scale: 1.01 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                    <Calendar className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-xl font-bold text-neutral-900">
+                    {nextCheckinInfo.daysUntil > 0 ? `${nextCheckinInfo.daysUntil}d` : 'Today'}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-gray-700 mb-2">Next Check-in</h3>
+                <p className="text-sm text-gray-600">{nextCheckinInfo.message}</p>
+              </motion.div>
+            </div>
+
+            {/* Middle Section - Main Content + Sidebar */}
+            <div className="grid grid-cols-12 gap-6">
+              {/* Left Column - 75% width (9 columns) */}
+              <div className="col-span-12 xl:col-span-9 space-y-6">
+                
+                {/* Analytics Header */}
+                <motion.div 
+                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-1">Analytics Dashboard</h2>
+                      <p className="text-sm text-gray-600">Track your wellness journey over time</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      {[7, 30, 90].map((period) => (
+                        <motion.button
+                          key={period}
+                          onClick={() => setViewPeriod(period)}
+                          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 ${
+                            viewPeriod === period
+                              ? 'bg-blue-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {period}d
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Historical Metrics Grid */}
+                <motion.div 
+                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                >
+                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Avg Wellness</p>
+                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.avgWellness}</p>
                       </div>
-                      <div className={`px-3 py-2 rounded-xl text-sm ${msg.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white text-gray-900 border'}`}>
-                        {msg.message}
+                      <TrendingUp className="h-8 w-8 text-green-600" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{historicalMetrics.totalCheckins} check-ins</p>
+                  </div>
+                  
+                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Avg Stress</p>
+                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.avgStress}</p>
+                      </div>
+                      <TrendingDown className="h-8 w-8 text-red-600" />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">{historicalMetrics.totalCheckins} check-ins</p>
+                  </div>
+                  
+                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Total Data</p>
+                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.totalCheckins}</p>
+                      </div>
+                      <BarChart3 className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Historic records</p>
+                  </div>
+                  
+                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Stability</p>
+                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.stabilityScore}%</p>
+                      </div>
+                      <Target className="h-8 w-8 text-purple-600" />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Consistency</p>
+                  </div>
+                </motion.div>
+
+                {/* Wellness Trends Chart */}
+                {filteredCheckins.length > 0 && (
+                  <motion.div 
+                    className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.3 }}
+                  >
+                    <div className="p-6">
+                      <div className="flex justify-between items-center mb-6">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">
+                            Wellness Trends
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''} • Last {viewPeriod} days
+                          </p>
+                        </div>
+                        <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                          Updated {new Date().toLocaleTimeString()}
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-4">
+                        <WellnessGraph checkins={filteredCheckins} />
                       </div>
                     </div>
                   </motion.div>
-                ))}
-              </div>
-              <div className="p-4 border-t bg-white">
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Type message..."
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                )}
+
+                {/* AI Insights */}
+                {aiInsights && (
+                  <motion.div 
+                    className="rounded-xl shadow-lg bg-gradient-to-br from-purple-50/80 to-indigo-50/80 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.4 }}
                   >
-                    <MessageCircle className="w-4 h-4" />
-                  </button>
+                    <div className="flex items-center mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-md">
+                        <Brain className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">AI Insights</h3>
+                        <p className="text-xs text-gray-600">
+                          Based on {aiInsights.basedOnCheckins} check-ins • Avg: {aiInsights.avgScore}/10
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-gray-800 mb-4 leading-relaxed">
+                      {aiInsights.insight}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {aiInsights.recommendations.map(tag => (
+                        <span 
+                          key={tag} 
+                          className="px-3 py-1 bg-white/80 rounded-full text-xs font-medium text-purple-800 shadow-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Right Column - 25% width (3 columns) */}
+              <div className="col-span-12 xl:col-span-3 space-y-6">
+                
+                {/* Daily Goals */}
+                <motion.div 
+                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Daily Goals</h3>
+                  <div className="space-y-3">
+                    {dailyGoals.map(goal => (
+                      <div 
+                        key={goal.id}
+                        className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors hover:scale-105"
+                      >
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm">
+                          <goal.icon className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="flex-1 text-sm font-medium text-gray-800">
+                          {goal.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* Crisis Support */}
+                <motion.div 
+                  className="rounded-xl shadow-lg bg-gradient-to-br from-red-50/80 to-pink-50/80 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                >
+                  <h3 className="text-lg font-bold text-red-900 mb-3">Crisis Support</h3>
+                  <p className="text-sm text-gray-700 mb-4">24/7 help available</p>
+                  <motion.button 
+                    onClick={() => window.open('tel:988', '_self')}
+                    className="w-full bg-gradient-to-r from-red-400 to-red-600 text-white py-3 rounded-xl font-semibold hover:from-red-500 hover:to-red-700 transition-all duration-300 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-105"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Call 988</span>
+                  </motion.button>
+                  <p className="text-xs text-gray-600 mt-2 text-center">
+                    Free, confidential support
+                  </p>
+                </motion.div>
+
+                {/* Quick Actions */}
+                <motion.div 
+                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.3 }}
+                >
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
+                  <div className="space-y-3">
+                    <motion.button
+                      onClick={() => navigate('/survey')}
+                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white py-3 px-4 rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-teal-500/25 hover:shadow-xl hover:ring-2 hover:ring-teal-300 flex items-center justify-center space-x-2 hover:scale-105"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Take Survey</span>
+                    </motion.button>
+                    <motion.button
+                      onClick={() => setShowChatbot(true)}
+                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-purple-500/25 hover:shadow-2xl hover:ring-2 hover:ring-purple-300 flex items-center justify-center space-x-2 hover:scale-105"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Heart className="w-4 h-4" />
+                      <span>Chat with Sarthi</span>
+                    </motion.button>
+                    <motion.button
+                      onClick={loadAllCheckins}
+                      className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold flex items-center justify-center space-x-2 hover:scale-105"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Refresh</span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                {/* Therapist Landing Section */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                >
+                  <TherapistLandingSection />
+                </motion.div>
+
+                {/* Chat History Widget */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.5 }}
+                >
+                  <ChatHistoryWidget 
+                    userId={currentUser?.uid} 
+                    onResumeChat={handleResumeChat}
+                  />
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Manova Chatbot Modal */}
+      {showChatbot && (
+        <motion.div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowChatbot(false)}
+        >
+          <motion.div
+            className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col mx-4 md:mx-0"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 md:px-6 border-b border-gray-200 bg-white shadow-sm rounded-t-lg z-10">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden bg-gradient-to-br from-amber-100 to-orange-100">
+                  <img 
+                    src="/images/mascot.svg" 
+                    alt="Sarthi Avatar"
+                    className="w-10 h-10 object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg md:text-xl font-semibold text-gray-800 truncate">
+                    Sarthi – Your Emotional Wellness Companion
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Here to listen, understand, and support.
+                  </p>
                 </div>
               </div>
-            </motion.div>
+              
+              <div className="flex items-center space-x-2 flex-shrink-0">
+                <motion.button
+                  onClick={() => {
+                    if (newChatFunctionRef.current) {
+                      newChatFunctionRef.current();
+                    } else {
+                      console.log('New chat function not available yet');
+                    }
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all shadow-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">New Chat</span>
+                </motion.button>
+                
+                <button
+                  onClick={() => setShowChatbot(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatSessionProvider userId={currentUser?.uid}>
+                <SarthiChatbox 
+                  userId={currentUser?.uid}
+                  onNewChat={(startNewChatFn) => {
+                    // Store the function reference to use in the header
+                    newChatFunctionRef.current = startNewChatFn;
+                  }}
+                />
+              </ChatSessionProvider>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      )}
     </div>
   );
 };
 
-export default DashboardPage; 
+export default DashboardPage;
