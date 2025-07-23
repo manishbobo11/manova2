@@ -48,14 +48,12 @@ const TherapistBookingModal = ({
 
   if (!therapist) return null;
 
-  // Generate next 7 days with default time slots
-  const generateCalendarWeeks = () => {
-    const weeks = [];
+  // Generate next 7 days with proper date formatting
+  const generateNext7Days = () => {
+    const dates = [];
     const today = new Date();
     const defaultTimeSlots = ["10:00", "14:00", "18:00"]; // 10:00 AM, 2:00 PM, 6:00 PM
     
-    // Generate only next 7 days (1 week)
-    const week = [];
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const date = new Date(today);
       date.setDate(today.getDate() + dayOffset);
@@ -66,19 +64,28 @@ const TherapistBookingModal = ({
       const availability = therapist.availability?.slots?.find(slot => slot.date === dateStr);
       const times = availability?.times || defaultTimeSlots;
       
-      week.push({
+      // Format date using Intl API
+      const formattedDate = new Intl.DateTimeFormat('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      }).format(date);
+      
+      dates.push({
         date,
         dateStr,
-        available: true, // Make all dates available
-        times: times
+        formattedDate,
+        available: true,
+        times: times,
+        dayOfWeek: date.getDay(), // 0 = Sunday, 1 = Monday, etc.
+        isToday: dayOffset === 0
       });
     }
-    weeks.push(week);
-    return weeks;
+    
+    return dates;
   };
 
-  const calendarWeeks = generateCalendarWeeks();
-  const currentWeekData = calendarWeeks[currentWeek] || [];
+  const availableDates = generateNext7Days();
 
   const handleDateSelect = (dateData) => {
     if (!dateData.available) return;
@@ -291,56 +298,113 @@ const TherapistBookingModal = ({
                 <div className="space-y-6">
                   {/* Calendar */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-bold text-gray-900">Select Date (Next 7 Days)</h4>
+                    <div className="mb-6">
+                      <h4 className="text-lg font-bold text-gray-900 mb-2">Select Date</h4>
+                      <p className="text-sm text-gray-600">Choose from the next 7 available days</p>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2 mb-4">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
-                          {day}
+                    {/* Responsive Calendar Layout */}
+                    <div className="mb-6">
+                      {/* Mobile: Horizontal Scroll */}
+                      <div className="md:hidden">
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                          {availableDates.map((dateData, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleDateSelect(dateData)}
+                              disabled={!dateData.available}
+                              className={`flex-shrink-0 min-w-[100px] p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
+                                selectedDate?.dateStr === dateData.dateStr
+                                  ? 'bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105'
+                                  : dateData.available
+                                  ? 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                                  : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
+                              }`}
+                            >
+                              <div className="text-xs font-medium mb-1">
+                                {dateData.formattedDate.split(', ')[0]}
+                              </div>
+                              <div className={`text-sm font-bold ${
+                                dateData.isToday ? 'text-blue-600' : ''
+                              }`}>
+                                {dateData.formattedDate.split(', ')[1]}
+                              </div>
+                              {dateData.isToday && (
+                                <div className="text-xs text-blue-600 mt-1">Today</div>
+                              )}
+                            </button>
+                          ))}
                         </div>
-                      ))}
-                      {currentWeekData.map((dateData, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleDateSelect(dateData)}
-                          disabled={!dateData.available}
-                          className={`aspect-square p-2 rounded-xl text-sm font-medium transition-all ${
-                            selectedDate?.dateStr === dateData.dateStr
-                              ? 'bg-blue-600 text-white'
-                              : dateData.available
-                              ? 'bg-gray-100 hover:bg-blue-100 text-gray-900'
-                              : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
-                          {dateData.date.getDate()}
-                        </button>
-                      ))}
+                      </div>
+
+                      {/* Desktop: Grid Layout */}
+                      <div className="hidden md:grid md:grid-cols-7 gap-3">
+                        {availableDates.map((dateData, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleDateSelect(dateData)}
+                            disabled={!dateData.available}
+                            className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
+                              selectedDate?.dateStr === dateData.dateStr
+                                ? 'bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105'
+                                : dateData.available
+                                ? 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                                : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="text-xs font-medium mb-1">
+                              {dateData.formattedDate.split(', ')[0]}
+                            </div>
+                            <div className={`text-sm font-bold ${
+                              dateData.isToday ? 'text-blue-600' : ''
+                            }`}>
+                              {dateData.formattedDate.split(', ')[1]}
+                            </div>
+                            {dateData.isToday && (
+                              <div className="text-xs text-blue-600 mt-1">Today</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   {/* Time Slots */}
-                  {selectedDate && selectedDate.times.length > 0 && (
+                  {selectedDate ? (
                     <div>
-                      <h4 className="text-lg font-bold text-gray-900 mb-4">
-                        Available Times - {formatDate(selectedDate.date)}
+                      <h4 className="text-lg font-bold text-gray-900 mb-2">
+                        Available Times
                       </h4>
-                      <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                        {selectedDate.times.map((time) => (
-                          <button
-                            key={time}
-                            onClick={() => handleTimeSelect(time)}
-                            className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                              selectedTime === time
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-gray-200 hover:border-blue-300 text-gray-700 hover:bg-blue-50'
-                            }`}
-                          >
-                            {formatTime(time)}
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        {selectedDate.formattedDate} • {selectedDate.times.length} slots available
+                      </p>
+                      
+                      {selectedDate.times.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {selectedDate.times.map((time) => (
+                            <button
+                              key={time}
+                              onClick={() => handleTimeSelect(time)}
+                              className={`p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
+                                selectedTime === time
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md transform scale-105'
+                                  : 'border-gray-200 hover:border-blue-300 text-gray-700 hover:bg-blue-50 shadow-sm'
+                              }`}
+                            >
+                              <div className="text-sm font-bold">{formatTime(time)}</div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <p>No time slots available for this date</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-400">
+                      <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-sm">Select a date above to see available time slots</p>
                     </div>
                   )}
                 </div>
