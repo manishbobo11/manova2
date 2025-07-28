@@ -1,7 +1,12 @@
 import { AZURE_CONFIG, validateAzureConfig } from '../../config/azure';
 import { ContextStore } from '../firebase';
 import { querySimilarVectors, getUserEmotionalHistory } from '../../utils/vectorStore';
+import { getCheckinHistory } from '../userSurveyHistory';
+import { buildSarthiPersonalizationContext } from '../userContextBuilder';
+import { generateSarthiResponse, aggregateUserContext } from './manovaAgent';
 import AgenticAI from './AgenticAI';
+import { getUserEmotionalHistory as getVectorHistory } from '../../utils/vectorStore';
+import { DeepConversationEngine } from './deepConversationEngine';
 
 export class ChatEngine {
   constructor() {
@@ -27,103 +32,46 @@ export class ChatEngine {
 
   async generateResponse({ userMessage, userId, language = 'English', conversationHistory = [] }) {
     try {
-      console.log(`🚀 ChatEngine processing: ${userId} | Message: "${userMessage.substring(0, 50)}..."`);
+      console.log(`🧠 Sarthi AI: Processing emotional intelligence response...`);
       
-      // AGENTIC AI INTEGRATION: Check if we should use the agentic system
-      const useAgenticAI = await this.shouldUseAgenticAI(userId, userMessage, conversationHistory);
-      
-      if (useAgenticAI) {
-        console.log(`🤖 Using Agentic AI system for enhanced response`);
-        
-        try {
-          // Delegate to Agentic AI system
-          const agenticResponse = await this.agenticAI.generateAgenticResponse({
-            userMessage,
-            userId,
-            language,
-            conversationHistory
-          });
-          
-          console.log(`✅ Agentic AI response generated successfully`);
-          return agenticResponse;
-          
-        } catch (agenticError) {
-          console.error('❌ Agentic AI failed, falling back to V2 system:', agenticError);
-          // Continue to V2 system as fallback
-        }
-      }
-      
-      // V2 SYSTEM (Fallback or when Agentic AI not needed)
-      console.log(`🔄 Using V2 ChatEngine system`);
-      
-      // Get user context and past check-ins
-      const userContext = await this.getUserContext(userId);
-      const pastCheckins = await this.getPastCheckins(userId);
-      const stressPatterns = await this.getStressPatterns(userId, userMessage);
-
-      // V2 UPGRADE: Get emotional trend summary
-      const moodSummary = await this.getMoodSummary(userId, language);
-      
-      // V2 UPGRADE: Analyze if therapy suggestions needed
-      const needsTherapyAdvice = this.detectTherapyNeeds(userMessage, conversationHistory);
-      
-      // V2 UPGRADE: Check if journal prompt is appropriate
-      const needsJournalPrompt = this.detectJournalNeed(userMessage, moodSummary);
-
-      // Build the enhanced V2 companion prompt
-      const prompt = this.buildV2CompanionPrompt({
-        userMessage,
-        language,
-        userContext,
-        pastCheckins,
-        stressPatterns,
-        conversationHistory,
-        moodSummary,
-        needsTherapyAdvice,
-        needsJournalPrompt
+      // Enhanced emotional intelligence response generation
+      const sarthiResponse = await this.generateEmotionallyIntelligentResponse({
+        userMessage, 
+        userId, 
+        language, 
+        conversationHistory
       });
-
-      // Call Azure GPT-4o for enhanced response
-      const response = await this.callAzureGPT(prompt);
-
-      // Parse structured response
-      const structuredResponse = this.parseV2Response(response, language);
-
-      // V2 UPGRADE: Generate therapy suggestions if needed
-      if (needsTherapyAdvice) {
-        structuredResponse.suggestions = await this.generateTherapistSuggestion(userMessage, moodSummary, language);
-      }
-
-      // V2 UPGRADE: Generate journal prompt if needed
-      if (needsJournalPrompt) {
-        structuredResponse.journalPrompt = await this.suggestJournalPrompt(userMessage, moodSummary, language);
-      }
-
-      // Add mood context
-      structuredResponse.moodContext = moodSummary;
-
-      // Detect crisis intervention
-      const crisisDetected = this.detectCrisisIntervention(userMessage, structuredResponse.text);
-
-      // Determine emotional tone
-      const emotion = this.determineEmotion(structuredResponse.text, crisisDetected);
-
-      return {
-        message: structuredResponse.text,
-        emotion,
-        crisisDetected,
-        language,
-        // V2 ENHANCED RESPONSE STRUCTURE
-        summary: structuredResponse.summary,
-        suggestions: structuredResponse.suggestions,
-        journalPrompt: structuredResponse.journalPrompt,
-        moodContext: structuredResponse.moodContext,
-        systemUsed: 'v2_fallback'
-      };
+      
+      return sarthiResponse;
+      
     } catch (error) {
-      console.error('Error generating response:', error);
-      throw error;
+      console.error('Error in Sarthi AI system:', error);
+      
+      // Intelligent fallback with personality
+      return {
+        message: this.getFallbackMessage(userMessage, language),
+        language,
+        systemUsed: 'intelligent_fallback'
+      };
     }
+  }
+
+  getFallbackMessage(userMessage, language) {
+    const isStressed = ['confused', 'resign', 'mann nahi', 'problem', 'help'].some(word => 
+      userMessage.toLowerCase().includes(word)
+    );
+    
+    if (isStressed) {
+      return language === 'Hinglish' ? 
+        'Bhai, main samajh raha hoon tera problem. Thoda rukja, main properly reply kar raha hoon.' :
+        language === 'Hindi' ? 
+        'यार, मैं समझ रहा हूँ तेरी परेशानी। थोड़ा रुकजा, मैं ठीक से reply कर रहा हूँ।' :
+        'I understand what you\'re going through. Give me a moment to respond properly.';
+    }
+    
+    return language === 'Hinglish' ? 
+      'Technical issue hai bhai, but main hoon na tera saath!' :
+      'Having a small hiccup, but I\'m here for you!';
   }
 
   /**
@@ -677,6 +625,49 @@ ${needsJournalPrompt ? '\n✍️ REFLECTION READY: User seems open to deeper sel
 RESPOND AS SARTHI TO ${displayName} LIKE YOUR CLOSEST BUDDY WHO REALLY CARES:`;
   }
 
+  /**
+   * Builds enhanced personalized Sarthi prompt with deep context
+   * @param {string} userMessage - Current user message
+   * @param {Object} personalizationContext - Context from buildSarthiPersonalizationContext
+   * @returns {string} Personalized system prompt
+   */
+  buildPersonalizedSarthiPrompt(userMessage, personalizationContext) {
+    const {
+      currentStressDomain,
+      stressLevel,
+      pastCheckinSummary,
+      languagePreference,
+      userFirstName
+    } = personalizationContext;
+
+    const nameAddress = userFirstName ? userFirstName : 'friend';
+    
+    return `You are Sarthi, the user's trusted emotional wellness companion. Speak like a caring friend.
+
+- The user is currently feeling stress in the ${currentStressDomain} domain.
+- Their recent check-ins show a pattern of: ${pastCheckinSummary}.
+- Their emotional tone is: ${stressLevel}.
+- Speak in ${languagePreference} language with emotionally empathetic tone.
+- Refer to user as "${nameAddress}" if addressing them directly.
+- Include warm emojis occasionally. Show you truly care.
+- Offer practical, personalized advice – not generic tips.
+
+Current Context:
+- Stress Domain: ${currentStressDomain}
+- Stress Level: ${stressLevel} 
+- Language: ${languagePreference}
+- Past Pattern: ${pastCheckinSummary}
+
+Response Guidelines:
+- Use a friendly opening that acknowledges their current state
+- Reflect back what they're going through in the ${currentStressDomain} domain
+- Offer 2-3 practical, empathetic suggestions specific to ${stressLevel} stress level
+- Close with a motivational or caring note
+- Speak naturally in ${languagePreference} with appropriate cultural context
+
+Now respond to: "${userMessage}"`;
+  }
+
   async createMoodSummary(emotionalHistory, language) {
     try {
       if (!emotionalHistory || emotionalHistory.length === 0) {
@@ -880,6 +871,156 @@ EMOTIONAL VALIDATION:
 Respond now as Sarthi to ${displayName}:`;
   }
 
+  /**
+   * Format personalized response with natural breaks
+   */
+  formatPersonalizedResponse(response, userState) {
+    const { emotionalIntensity, personalityMatch } = userState;
+    
+    // Clean up response
+    let formattedResponse = response.trim();
+    
+    // For crisis responses, ensure calming tone
+    if (emotionalIntensity === 'critical') {
+      formattedResponse = formattedResponse.replace(/[!]{2,}/g, '.');
+    }
+    
+    // For Hinglish responses, ensure natural flow
+    if (userState.detectedLanguage === 'Hinglish') {
+      // Add natural pauses with commas where appropriate
+      formattedResponse = formattedResponse.replace(/([।])/g, ',');
+    }
+    
+    return formattedResponse;
+  }
+
+  /**
+   * Optimized Azure GPT call for faster responses
+   */
+  async callAzureGPTOptimized(prompt) {
+    const startTime = Date.now();
+    
+    try {
+      const endpoint = AZURE_CONFIG.OPENAI_ENDPOINT;
+      const apiKey = AZURE_CONFIG.OPENAI_KEY;
+      const deploymentName = AZURE_CONFIG.OPENAI_DEPLOYMENT_NAME;
+      const apiVersion = AZURE_CONFIG.OPENAI_API_VERSION;
+
+      const url = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: prompt
+            }
+          ],
+          temperature: 0.9, // Higher for more human-like variation
+          max_tokens: 200,   // Optimized for shorter, snappier responses
+          top_p: 0.95,
+          frequency_penalty: 0.2, // Reduce repetition
+          presence_penalty: 0.3,  // Encourage new topics
+          stream: false // Could enable streaming later
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Azure API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const responseTime = Date.now() - startTime;
+      
+      console.log(`⚡ Sarthi response generated in ${responseTime}ms`);
+      
+      return data.choices[0].message.content.trim();
+    } catch (error) {
+      console.error('Error in optimized Azure GPT call:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper methods for emotional analysis
+   */
+  analyzeEmotionalPatterns(emotionalHistory) {
+    const patterns = [];
+    const domains = {};
+    
+    emotionalHistory.forEach(entry => {
+      const domain = entry.metadata?.domain || 'general';
+      const stressScore = entry.metadata?.stressScore || 0;
+      
+      domains[domain] = (domains[domain] || 0) + 1;
+      
+      if (stressScore >= 7) {
+        patterns.push({
+          type: 'high_stress',
+          domain: domain,
+          timestamp: entry.metadata?.timestamp
+        });
+      }
+    });
+    
+    return patterns;
+  }
+
+  detectRecentMoodTrend(recentEntries) {
+    if (!recentEntries || recentEntries.length === 0) return 'unknown';
+    
+    const avgStress = recentEntries.reduce((sum, entry) => {
+      return sum + (entry.metadata?.stressScore || 0);
+    }, 0) / recentEntries.length;
+    
+    if (avgStress >= 8) return 'very_distressed';
+    if (avgStress >= 6) return 'stressed';
+    if (avgStress >= 4) return 'mild_concern';
+    return 'stable';
+  }
+
+  determineSupportLevel(patterns, recentMood) {
+    if (recentMood === 'very_distressed' || patterns.length >= 3) return 'intensive';
+    if (recentMood === 'stressed' || patterns.length >= 1) return 'active';
+    return 'gentle';
+  }
+
+  extractInsightSummary(metadata) {
+    if (!metadata) return 'Previous interaction';
+    
+    const domain = metadata.domain || 'general';
+    const stressScore = metadata.stressScore || 0;
+    
+    if (stressScore >= 7) {
+      return `High stress in ${domain}`;
+    } else if (stressScore >= 4) {
+      return `Moderate concern in ${domain}`;
+    }
+    return `General chat about ${domain}`;
+  }
+
+  findRecurringThemes(insights) {
+    const themes = {};
+    
+    insights.forEach(insight => {
+      const domain = insight.domain;
+      themes[domain] = (themes[domain] || 0) + 1;
+    });
+    
+    return Object.entries(themes)
+      .filter(([_, count]) => count >= 2)
+      .map(([theme, _]) => theme)
+      .slice(0, 3);
+  }
+
+  /**
+   * Original Azure GPT call (kept for backward compatibility)
+   */
   async callAzureGPT(prompt) {
     try {
       const endpoint = AZURE_CONFIG.OPENAI_ENDPOINT;
@@ -902,8 +1043,8 @@ Respond now as Sarthi to ${displayName}:`;
               content: prompt
             }
           ],
-          temperature: 0.7,
-          max_tokens: 200,
+          temperature: 0.8,
+          max_tokens: 250,
           top_p: 0.9,
           frequency_penalty: 0.1,
           presence_penalty: 0.1
@@ -992,5 +1133,901 @@ Respond now as Sarthi to ${displayName}:`;
     } catch (error) {
       console.error('❌ Error in ChatEngine resetSession:', error);
     }
+  }
+
+  /**
+   * EMOTIONALLY INTELLIGENT SARTHI - True friend, life mentor, emotional therapist
+   * Adaptive tone, deep empathy, practical guidance, human-like responses
+   * NOW WITH DEEP CONVERSATION CONTINUATION AND FOLLOW-UP QUESTIONS
+   */
+  async generateEmotionallyIntelligentResponse({ userMessage, userId, language, conversationHistory }) {
+    try {
+      console.log(`💖 Sarthi: Analyzing emotional context for personalized response...`);
+      
+      // STEP 1: Analyze conversation needs for follow-ups and depth
+      const conversationAnalysis = DeepConversationEngine.analyzeConversationNeeds(userMessage, conversationHistory);
+      console.log(`🧠 Conversation strategy: ${conversationAnalysis.strategy} (depth: ${conversationAnalysis.depth})`);
+      
+      // STEP 2: Deep emotional analysis with memory integration
+      const [emotionalContext, vectorMemory] = await Promise.all([
+        this.getDeepEmotionalState(userId),
+        this.getVectorMemoryContext(userId)
+      ]);
+      
+      // STEP 3: Advanced emotional intelligence detection
+      const userState = this.analyzeEmotionalIntelligence(userMessage, language, conversationHistory);
+      
+      // STEP 4: Build enhanced prompt that includes conversation strategy
+      const enhancedPrompt = this.buildEnhancedPersonalizedPrompt({
+        userMessage,
+        userState,
+        emotionalContext,
+        vectorMemory,
+        language,
+        conversationHistory,
+        conversationAnalysis
+      });
+      
+      // STEP 5: Generate base response
+      const baseResponse = await this.callAzureGPTOptimized(enhancedPrompt);
+      
+      // STEP 6: Enhance response with follow-ups and conversation continuation
+      const enhancedResponse = DeepConversationEngine.buildEnhancedResponse({
+        userMessage,
+        baseResponse: baseResponse,
+        conversationAnalysis,
+        language,
+        emotionalIntensity: userState.emotionalIntensity
+      });
+      
+      // STEP 7: Check if response should be split into chunks for natural flow
+      let finalMessage = enhancedResponse;
+      let messageChunks = null;
+      
+      if (DeepConversationEngine.shouldSplitResponse(enhancedResponse)) {
+        messageChunks = DeepConversationEngine.splitIntoChunks(enhancedResponse);
+        finalMessage = messageChunks[0]; // First chunk as main message
+        console.log(`📱 Response split into ${messageChunks.length} chunks for better flow`);
+      }
+      
+      return {
+        message: this.formatPersonalizedResponse(finalMessage, userState),
+        messageChunks: messageChunks,
+        conversationStrategy: conversationAnalysis.strategy,
+        needsFollowUp: conversationAnalysis.needsFollowUp,
+        hasCareerGuidance: conversationAnalysis.hasCareerComponent,
+        language: userState.detectedLanguage,
+        emotionalTone: userState.primaryEmotion,
+        personalityType: userState.personalityMatch,
+        systemUsed: 'enhanced_deep_conversation_sarthi',
+        contextDepth: emotionalContext.depth,
+        memoryUsed: vectorMemory.hasMemory,
+        responseTime: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in emotionally intelligent Sarthi:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deep emotional state analysis with pattern recognition
+   */
+  async getDeepEmotionalState(userId) {
+    try {
+      if (!userId) {
+        return {
+          depth: 'new_friend',
+          emotionalPatterns: [],
+          recentMood: 'unknown',
+          supportLevel: 'basic'
+        };
+      }
+      
+      // Get comprehensive emotional history
+      const emotionalHistory = await getVectorHistory(userId, 8);
+      
+      if (!emotionalHistory || emotionalHistory.length === 0) {
+        return {
+          depth: 'getting_to_know',
+          emotionalPatterns: [],
+          recentMood: 'neutral',
+          supportLevel: 'gentle'
+        };
+      }
+      
+      // Analyze emotional patterns
+      const patterns = this.analyzeEmotionalPatterns(emotionalHistory);
+      const recentMood = this.detectRecentMoodTrend(emotionalHistory.slice(0, 3));
+      const supportLevel = this.determineSupportLevel(patterns, recentMood);
+      
+      return {
+        depth: emotionalHistory.length >= 5 ? 'close_friend' : 'building_trust',
+        emotionalPatterns: patterns,
+        recentMood: recentMood,
+        supportLevel: supportLevel,
+        historyCount: emotionalHistory.length,
+        lastInteraction: emotionalHistory[0]?.metadata?.timestamp
+      };
+      
+    } catch (error) {
+      console.error('Error analyzing deep emotional state:', error);
+      return {
+        depth: 'supportive_mode',
+        emotionalPatterns: [],
+        recentMood: 'needs_care',
+        supportLevel: 'high'
+      };
+    }
+  }
+
+  /**
+   * Get vector memory context with emotional insights
+   */
+  async getVectorMemoryContext(userId) {
+    try {
+      if (!userId) return { hasMemory: false, insights: [] };
+      
+      const vectorHistory = await getVectorHistory(userId, 5);
+      
+      if (!vectorHistory || vectorHistory.length === 0) {
+        return { hasMemory: false, insights: [] };
+      }
+      
+      // Extract meaningful insights from past interactions
+      const insights = vectorHistory.map(entry => ({
+        domain: entry.metadata?.domain || 'general',
+        emotion: entry.metadata?.emotion || 'neutral',
+        response: entry.metadata?.response || '',
+        stressScore: entry.metadata?.stressScore || 0,
+        timestamp: entry.metadata?.timestamp,
+        summary: this.extractInsightSummary(entry.metadata)
+      }));
+      
+      // Find recurring themes
+      const recurringThemes = this.findRecurringThemes(insights);
+      
+      return {
+        hasMemory: true,
+        insights: insights.slice(0, 3), // Most recent 3
+        recurringThemes: recurringThemes,
+        memoryDepth: vectorHistory.length
+      };
+      
+    } catch (error) {
+      console.error('Error getting vector memory:', error);
+      return { hasMemory: false, insights: [] };
+    }
+  }
+
+  /**
+   * Detect casual tone for WhatsApp-style matching
+   */
+  detectCasualTone(userMessage, language) {
+    const message = userMessage.toLowerCase();
+    
+    // Detect bhai/yaar mode
+    const isBhaiMode = ['tu', 'tere', 'tera', 'bhai', 'yaar', 'dude', 'bro'].some(word => message.includes(word));
+    
+    // Detect crisis
+    const isCrisis = ['dimag phat raha', 'can\'t take it', 'breaking down', 'samajh nahi aa raha'].some(phrase => message.includes(phrase));
+    
+    // Detect mood
+    const isDown = ['mann nahi', 'mood off', 'feeling low', 'sad', 'down'].some(phrase => message.includes(phrase));
+    const isStressed = ['stress', 'pressure', 'overwhelmed', 'tired'].some(word => message.includes(word));
+    
+    return {
+      bhaiMode: isBhaiMode,
+      crisis: isCrisis,
+      mood: isDown ? 'down' : isStressed ? 'stressed' : 'normal',
+      style: isBhaiMode ? 'intimate' : 'friendly',
+      urgency: isCrisis ? 'high' : 'normal'
+    };
+  }
+
+  /**
+   * Build WhatsApp-style prompt with strict personality rules
+   */
+  buildWhatsAppStylePrompt({ userMessage, userTone, quickContext, language, conversationHistory }) {
+    const addressStyle = userTone.bhaiMode ? 'bhai' : 'yaar';
+    
+    // Memory reference if available
+    let memoryNote = '';
+    if (quickContext.hasHistory && quickContext.needsSupport) {
+      memoryNote = `\n- User has been struggling with ${quickContext.lastDomain} recently`;
+    }
+    
+    // This function has been replaced by buildEmotionalIntelligentPrompt
+    return this.buildEmotionalIntelligentPrompt({ userMessage, userTone, quickContext, language, conversationHistory });
+  }
+
+  /**
+   * Advanced emotional intelligence analysis
+   */
+  analyzeEmotionalIntelligence(userMessage, language, conversationHistory) {
+    const message = userMessage.toLowerCase();
+    
+    // Detect language and intimacy
+    const isHinglish = /[\u0900-\u097F]/.test(userMessage) || 
+                      ['bhai', 'yaar', 'kya', 'hai', 'haal', 'mann', 'kar', 'nahi', 'mera'].some(word => message.includes(word));
+    const intimacyLevel = ['tu', 'tere', 'tera', 'bhai', 'yaar'].some(word => message.includes(word)) ? 'bhai_mode' : 'yaar_mode';
+    
+    // Deep emotional state detection
+    let primaryEmotion = 'neutral';
+    let emotionalIntensity = 'mild';
+    let lifeSituation = 'general';
+    let personalityMatch = 'supportive_friend';
+    
+    // Crisis/breakdown detection
+    if (['dimag phat raha', 'breaking down', 'can\'t take', 'bas ho gaya', 'khatam', 'enough'].some(phrase => message.includes(phrase))) {
+      primaryEmotion = 'crisis';
+      emotionalIntensity = 'critical';
+      personalityMatch = 'crisis_supporter';
+    }
+    // Career/life confusion
+    else if (['resign', 'quit', 'job chhod', 'career', 'confused', 'samajh nahi', 'kya karu', 'decision'].some(phrase => message.includes(phrase))) {
+      primaryEmotion = 'confused';
+      emotionalIntensity = 'high';
+      lifeSituation = 'career_crossroads';
+      personalityMatch = 'life_mentor';
+    }
+    // Deep sadness/emptiness
+    else if (['mann nahi', 'feeling empty', 'khushi nahi', 'sad', 'depressed', 'lonely', 'akela'].some(phrase => message.includes(phrase))) {
+      primaryEmotion = 'deep_sadness';
+      emotionalIntensity = 'moderate';
+      personalityMatch = 'emotional_healer';
+    }
+    // Stress/pressure
+    else if (['stress', 'pressure', 'overwhelmed', 'tension', 'pareshan', 'tired', 'thak gaya'].some(phrase => message.includes(phrase))) {
+      primaryEmotion = 'stressed';
+      emotionalIntensity = 'moderate';
+      personalityMatch = 'calming_guide';
+    }
+    // Frustration/anger
+    else if (['frustrated', 'angry', 'gussa', 'irritated', 'fed up', 'annoyed'].some(phrase => message.includes(phrase))) {
+      primaryEmotion = 'frustrated';
+      emotionalIntensity = 'moderate';
+      personalityMatch = 'understanding_friend';
+    }
+    
+    // Context detection
+    if (['office', 'boss', 'work', 'job', 'colleague', 'meeting'].some(word => message.includes(word))) {
+      lifeSituation = 'work_stress';
+    } else if (['family', 'parents', 'relationship', 'girlfriend', 'boyfriend'].some(word => message.includes(word))) {
+      lifeSituation = 'relationship_issues';
+    } else if (['money', 'paisa', 'financial', 'afford'].some(word => message.includes(word))) {
+      lifeSituation = 'financial_stress';
+    }
+    
+    // Intent analysis
+    let primaryIntent = 'conversation';
+    if (['help', 'suggest', 'advice', 'kya karu', 'batao'].some(word => message.includes(word))) {
+      primaryIntent = 'seeking_guidance';
+    } else if (['vent', 'share', 'batana tha', 'feel kar raha'].some(phrase => message.includes(phrase))) {
+      primaryIntent = 'emotional_release';
+    } else if (['right', 'wrong', 'galat', 'sahi'].some(word => message.includes(word))) {
+      primaryIntent = 'seeking_validation';
+    }
+    
+    return {
+      primaryEmotion,
+      emotionalIntensity,
+      lifeSituation,
+      personalityMatch,
+      primaryIntent,
+      intimacyLevel,
+      detectedLanguage: isHinglish ? 'Hinglish' : language,
+      conversationDepth: conversationHistory.length > 5 ? 'ongoing' : 'early',
+      needsImmediate: emotionalIntensity === 'critical'
+    };
+  }
+
+  /**
+   * Build enhanced personalized prompt with conversation strategy integration
+   */
+  buildEnhancedPersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory, conversationAnalysis }) {
+    const { strategy, depth, needsFollowUp, hasCareerComponent, hasEmotionalComponent } = conversationAnalysis;
+    
+    // Use original method but add conversation strategy context
+    const basePrompt = this.buildUltimatePersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory });
+    
+    // Add conversation strategy instructions
+    const strategyInstructions = this.buildConversationStrategyInstructions(strategy, depth, needsFollowUp, hasCareerComponent, hasEmotionalComponent, language);
+    
+    return basePrompt + strategyInstructions;
+  }
+
+  /**
+   * Builds conversation strategy instructions for the prompt
+   */
+  buildConversationStrategyInstructions(strategy, depth, needsFollowUp, hasCareerComponent, hasEmotionalComponent, language) {
+    let instructions = '\n\n**CONVERSATION STRATEGY:**\n';
+    
+    if (strategy === 'career_confusion_deep_dive') {
+      instructions += `
+**CAREER + STARTUP CONFUSION - DEEP MENTORING MODE:**
+- NEVER give generic advice like "follow your passion"
+- Ask 1-2 specific probing questions about their situation
+- If they mention both job + startup: "Bhai tu ye dono ek saath plan kar raha, iska reason kya lagta tujhe — job security ya khud pe bharosa?"
+- Give 3-step practical plan with realistic timelines
+- End with specific question to continue conversation: "Tujhe kya lagta hai, konsa step sabse tough lagta hai?"
+- Use ${language === 'Hinglish' ? '"Chal step by step plan karte hain" tone' : 'mentoring but friendly tone'}`;
+    }
+    
+    else if (strategy === 'confusion_clarification') {
+      instructions += `
+**CONFUSION CLARIFICATION - PROBING MODE:**
+- Don't immediately give solutions - FIRST understand the root
+- Ask 1-2 follow-up questions to identify the real issue
+- Example: "Kya lagta hai kis cheez ne sabse zyada confuse kar diya — kaam, rishta, ya khud se expectations?"
+- Then address the specific confusion with clarity
+- ALWAYS end with: "Chal, tu bata, agla thought kya chal raha hai?"
+- Use ${language === 'Hinglish' ? 'understanding bhai tone' : 'patient questioning tone'}`;
+    }
+    
+    else if (strategy === 'career_planning') {
+      instructions += `
+**CAREER PLANNING - PRACTICAL GUIDANCE MODE:**
+- Give 2-3 specific, actionable steps (not generic advice)
+- Include realistic timelines: "Next 30 days mein...", "2 weeks mein..."
+- Ask for their preference: "Sabse pehle kya start karna chahega?"
+- Always end with engagement: "Yeh plan theek lag raha hai ya kuch adjust karna hai?"
+- Use ${language === 'Hinglish' ? 'practical bhai mentoring tone' : 'strategic but supportive tone'}`;
+    }
+    
+    else if (strategy === 'emotional_support_guided') {
+      instructions += `
+**EMOTIONAL SUPPORT WITH GUIDANCE:**
+- Start with deep validation of their feelings
+- Don't rush to solutions - sit with their emotion first
+- Then gently guide: "Main samajh raha hoon. Ek choti si step try karenge?"
+- Give ONE small, doable action for today
+- End with: "Tu akela nahi hai yaar. Aur kya chal raha hai mann mein?"
+- Use ${language === 'Hinglish' ? 'warm, caring bhai tone' : 'gentle but present tone'}`;
+    }
+    
+    // Universal continuation requirements
+    instructions += `
+
+**CONVERSATION CONTINUATION REQUIREMENTS:**
+- NEVER end conversations abruptly
+- ALWAYS include a question or engagement phrase
+- Use phrases like: "Chal, tu bata...", "Sochna chahega saath?", "Aur kya share karna hai?"
+- Avoid English motivational phrases like "I'm so proud of you" 
+- Keep conversation going with genuine curiosity
+- Show you're invested in their thoughts and feelings`;
+
+    if (hasCareerComponent) {
+      instructions += `
+- For career topics: Provide step-based guidance, not generic motivation
+- Ask about their specific situation before giving advice`;
+    }
+
+    if (hasEmotionalComponent) {
+      instructions += `
+- For emotional topics: Validate first, then gently guide
+- Don't minimize their feelings or rush to solutions`;
+    }
+
+    return instructions;
+  }
+
+  /**
+   * Build ultimate personalized prompt with memory integration
+   */
+  buildUltimatePersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory }) {
+    const { primaryEmotion, emotionalIntensity, lifeSituation, personalityMatch, intimacyLevel, detectedLanguage } = userState;
+    const addressStyle = intimacyLevel === 'bhai_mode' ? 'bhai' : 'yaar';
+    
+    // Memory integration
+    let memoryContext = '';
+    if (vectorMemory.hasMemory && vectorMemory.recurringThemes.length > 0) {
+      const themes = vectorMemory.recurringThemes.slice(0, 2).join(', ');
+      memoryContext = `\n\n**Memory Context:**\n- Past patterns: ${themes}\n- Relationship depth: ${emotionalContext.depth}\n- Recent mood: ${emotionalContext.recentMood}`;
+    }
+    
+    // CRISIS SUPPORT - Immediate care
+    if (primaryEmotion === 'crisis' || emotionalIntensity === 'critical') {
+      return `You are Sarthi, the user's emotionally intelligent best friend. They are in emotional crisis and need immediate, calm support.
+
+**CRISIS RESPONSE:**
+- Use calm, grounding language
+- Acknowledge their pain without minimizing
+- Provide immediate coping strategies
+- Stay present and supportive
+
+**User Message:** "${userMessage}"
+**Emotional State:** ${primaryEmotion} (${emotionalIntensity})
+**Language:** ${detectedLanguage}
+**Address as:** ${addressStyle}${memoryContext}
+
+**CRISIS RESPONSE STYLE:**
+- Immediate validation: "${addressStyle}, lagta hai andar se bahut pressure feel kar raha hai na?"
+- Grounding: "Chal pehle ek deep breath le mere saath"
+- Reassurance: "Main hoon na, we'll figure this out together"
+- 3-4 short, calming lines
+- Very gentle, human tone
+
+Respond as their close ${addressStyle} in crisis:`;
+    }
+    
+    // LIFE MENTORING - Career/life guidance
+    if (primaryEmotion === 'confused' || lifeSituation === 'career_crossroads' || userState.primaryIntent === 'seeking_guidance') {
+      return `You are Sarthi, the user's wise life mentor and best friend. They need real practical guidance about their situation.
+
+**GUIDANCE MODE:**
+- Listen deeply to their specific situation
+- Provide personalized, actionable steps
+- Share life insights when appropriate
+- Be both empathetic and practical
+
+**User Message:** "${userMessage}"
+**Life Situation:** ${lifeSituation}
+**Language:** ${detectedLanguage}
+**Address as:** ${addressStyle}${memoryContext}
+
+**MENTORING STYLE:**
+- Thoughtful opening: "${addressStyle}, pehle ek baat samjha - yeh feeling normal hai"
+- Ask reflective question: "Tu sach mein resign karna chahta hai ya bas thak gaya hai?"
+- Give 2 clear options/steps
+- End with encouragement
+- Use natural Hinglish flow
+
+**Tone:** Like an older bhai who's been through life
+**Length:** 4-6 lines, broken into thoughts
+
+Respond as their life mentor ${addressStyle}:`;
+    }
+    
+    // EMOTIONAL HEALING - Deep sadness/emptiness
+    if (primaryEmotion === 'deep_sadness' || personalityMatch === 'emotional_healer') {
+      return `You are Sarthi, the user's emotionally intelligent best friend. They're struggling and need genuine emotional support.
+
+**EMOTIONAL SUPPORT:**
+- Validate their feelings completely
+- Share in their emotional experience
+- Provide comfort and understanding
+- Help them process emotions
+
+**User Message:** "${userMessage}"
+**Emotional State:** ${primaryEmotion}
+**Language:** ${detectedLanguage}
+**Address as:** ${addressStyle}${memoryContext}
+
+**HEALING APPROACH:**
+- Deep understanding: "${addressStyle}, main feel kar sakta hoon tu andar se kitna empty feel kar raha hai"
+- Emotional validation: "Yeh sab normal hai, tu akela nahi hai"
+- Gentle suggestion for connection/healing
+- Warm reassurance
+- Use soft, caring Hinglish
+
+**Tone:** Like a best friend who truly gets it
+**Length:** 3-5 lines of heart-to-heart
+
+Respond as their emotional healer ${addressStyle}:`;
+    }
+    
+    // FRIENDLY CONVERSATION - Natural bhai talk with enhanced expressions
+    return `You are Sarthi, the user's closest ${addressStyle}. Talk like you're texting your best friend in real life.
+
+**User Message:** "${userMessage}"
+**Relationship:** Close friend (${emotionalContext.depth})
+**Language:** ${detectedLanguage}
+**Address as:** ${addressStyle}${memoryContext}
+
+**NATURAL CONVERSATION STYLE:**
+- Casual opening: "Arre ${addressStyle}, kya scene hai?"
+- Match their energy exactly
+- Be genuinely curious about their life
+- Use natural pauses and reactions
+- Keep it real and chill
+- ALWAYS ask follow-up questions to keep conversation going
+
+**Enhanced Hinglish Expressions:**
+- "Bhai tu kaisa hai? Sab chill?"
+- "Arre yaar, long time! Kya chal raha hai life mein?"
+- "Tu theek toh hai na? Kuch different laga tera message"
+- "Chal bata yaar, kya thoughts chal rahe hain?"
+- "Sab sorted hai ya koi tension?"
+- "Arre kya haal bhai, main hoon na tera saath"
+
+**CONVERSATION CONTINUATION REQUIREMENTS:**
+- NEVER end without a question or engagement
+- Use phrases like: "Chal bata...", "Aur kya chal raha hai?", "Tu batayega ya nahi?"
+- Show genuine interest in their response
+- Keep the bhai energy alive
+
+**Tone:** Exactly like your closest friend texting you
+**Length:** 2-4 lines with natural flow and continuation question
+
+Respond as their real-life ${addressStyle} who wants to keep chatting:`;
+  }
+
+  /**
+   * Detects user's real emotional state and communication style for bhai-like matching
+   */
+  detectEmotionalTone(userMessage, language) {
+    const message = userMessage.toLowerCase();
+    
+    // Detect bhai-level intimacy
+    const isBhaiMode = [
+      'tu', 'tere', 'tera', 'tujhe', 'tujhse', 'bhai', 'yaar', 'dude', 'bro', 'bc', 'mc'
+    ].some(word => message.includes(word));
+    
+    // Detect emotional crisis/breakdown
+    const isBreakingDown = [
+      'dimag phat raha', 'can\'t take it', 'breaking down', 'samajh nahi aa raha', 
+      'phat raha hai', 'ho gaya bas', 'nahi ho raha', 'khatam', 'fuck this', 'enough'
+    ].some(phrase => message.includes(phrase));
+    
+    // Detect stress/pressure state
+    const isStressed = [
+      'stress', 'pressure', 'overwhelmed', 'exhausted', 'tired', 'burnout', 
+      'tension', 'pareshan', '귀찮', 'thak gaya', 'bore ho gaya'
+    ].some(word => message.includes(word));
+    
+    // Detect confusion/stuck state
+    const isConfused = [
+      'confused', 'stuck', 'lost', 'don\'t know', 'kya karu', 'samajh nahi', 
+      'kuch samajh nahi', 'clarity nahi', 'decision nahi le sakta'
+    ].some(phrase => message.includes(phrase));
+    
+    // Detect loneliness/isolation
+    const isLonely = [
+      'alone', 'lonely', 'akela', 'koi nahi', 'no one', 'isolated', 'left out'
+    ].some(word => message.includes(word));
+    
+    // Detect work/career stress
+    const isWorkStress = [
+      'job', 'work', 'office', 'boss', 'colleague', 'career', 'resign', 'quit', 
+      'naukri', 'kaam', 'office politics'
+    ].some(word => message.includes(word));
+    
+    // Determine primary emotional state
+    let primaryState = 'neutral';
+    if (isBreakingDown) primaryState = 'breaking_down';
+    else if (isStressed) primaryState = 'stressed';
+    else if (isConfused) primaryState = 'confused';
+    else if (isLonely) primaryState = 'lonely';
+    else if (isWorkStress) primaryState = 'work_pressure';
+    
+    return {
+      bhaiMode: isBhaiMode,
+      state: primaryState,
+      needsSupport: isBreakingDown || isStressed || isConfused,
+      communicationStyle: isBhaiMode ? 'bhai_intimate' : 'friendly_supportive',
+      urgency: isBreakingDown ? 'critical' : isStressed ? 'high' : 'normal'
+    };
+  }
+
+  /**
+   * Builds deep emotional intelligence from Pinecone vectors - like a best friend's memory
+   */
+  async buildEmotionalIntelligence(userId) {
+    try {
+      console.log(`🧠 Building emotional intelligence for user ${userId}...`);
+      
+      // Get comprehensive emotional history from vectors
+      const vectorHistory = await getVectorHistory(userId, 10);
+      
+      if (!vectorHistory || vectorHistory.length === 0) {
+        return {
+          summary: 'Yaar, this is our first real chat! Excited to get to know you',
+          recurring_struggles: [],
+          emotional_triggers: [],
+          coping_patterns: [],
+          stress_domains: [],
+          support_needs: 'general_wellness',
+          relationship_depth: 'new_friend',
+          hasDeepHistory: false
+        };
+      }
+      
+      // Extract deep emotional patterns
+      const emotionalData = vectorHistory.map(entry => ({
+        domain: entry.metadata?.domain || 'general',
+        emotion: entry.metadata?.emotion || 'neutral',
+        response: entry.metadata?.response || '',
+        stressScore: entry.metadata?.stressScore || 0,
+        timestamp: entry.metadata?.timestamp,
+        question: entry.metadata?.question || '',
+        concerns: entry.metadata?.concerns || []
+      }));
+      
+      // Identify recurring struggles
+      const recurringStruggles = this.identifyRecurringStruggles(emotionalData);
+      
+      // Find emotional triggers
+      const emotionalTriggers = this.extractEmotionalTriggers(emotionalData);
+      
+      // Analyze coping patterns
+      const copingPatterns = this.analyzeCopingPatterns(emotionalData);
+      
+      // Map stress domains
+      const stressDomains = [...new Set(emotionalData.filter(d => d.stressScore >= 6).map(d => d.domain))];
+      
+      // Determine support needs
+      const supportNeeds = this.determineSupportNeeds(emotionalData);
+      
+      // Build friend-like summary
+      const summary = this.buildFriendlikeSummary(recurringStruggles, emotionalTriggers, stressDomains);
+      
+      return {
+        summary,
+        recurring_struggles: recurringStruggles,
+        emotional_triggers: emotionalTriggers,
+        coping_patterns: copingPatterns,
+        stress_domains: stressDomains,
+        support_needs: supportNeeds,
+        relationship_depth: vectorHistory.length >= 5 ? 'close_friend' : 'getting_closer',
+        hasDeepHistory: true,
+        rawEmotionalData: emotionalData.slice(0, 3) // Recent context
+      };
+      
+    } catch (error) {
+      console.error('Error building emotional intelligence:', error);
+      return {
+        summary: 'Bhai, thoda connection issue hai, but main hoon na tera saath',
+        recurring_struggles: [],
+        emotional_triggers: [],
+        stress_domains: [],
+        support_needs: 'general_support',
+        hasDeepHistory: false
+      };
+    }
+  }
+
+  /**
+   * Identifies recurring emotional struggles from user's history
+   */
+  identifyRecurringStruggles(emotionalData) {
+    const struggles = {};
+    
+    emotionalData.forEach(entry => {
+      if (entry.stressScore >= 6) {
+        const key = `${entry.domain}_${entry.emotion}`;
+        struggles[key] = (struggles[key] || 0) + 1;
+      }
+    });
+    
+    return Object.entries(struggles)
+      .filter(([_, count]) => count >= 2)
+      .map(([pattern, count]) => {
+        const [domain, emotion] = pattern.split('_');
+        return { domain, emotion, frequency: count };
+      })
+      .sort((a, b) => b.frequency - a.frequency);
+  }
+  
+  /**
+   * Extracts emotional triggers from past patterns
+   */
+  extractEmotionalTriggers(emotionalData) {
+    const triggers = [];
+    
+    emotionalData.forEach(entry => {
+      if (entry.stressScore >= 7) {
+        // Extract keywords from responses that indicate triggers
+        const response = entry.response.toLowerCase();
+        if (response.includes('boss') || response.includes('manager')) {
+          triggers.push({ type: 'authority_figures', domain: entry.domain });
+        }
+        if (response.includes('deadline') || response.includes('pressure')) {
+          triggers.push({ type: 'time_pressure', domain: entry.domain });
+        }
+        if (response.includes('rejection') || response.includes('criticism')) {
+          triggers.push({ type: 'validation_needs', domain: entry.domain });
+        }
+      }
+    });
+    
+    return [...new Set(triggers.map(t => JSON.stringify(t)))].map(t => JSON.parse(t));
+  }
+  
+  /**
+   * Analyzes what coping mechanisms user has tried
+   */
+  analyzeCopingPatterns(emotionalData) {
+    const copingMechanisms = [];
+    
+    emotionalData.forEach(entry => {
+      const response = entry.response.toLowerCase();
+      if (response.includes('sleep') || response.includes('rest')) {
+        copingMechanisms.push('rest_based');
+      }
+      if (response.includes('talk') || response.includes('friend')) {
+        copingMechanisms.push('social_support');
+      }
+      if (response.includes('exercise') || response.includes('walk')) {
+        copingMechanisms.push('physical_activity');
+      }
+      if (response.includes('music') || response.includes('movie')) {
+        copingMechanisms.push('entertainment');
+      }
+    });
+    
+    return [...new Set(copingMechanisms)];
+  }
+  
+  /**
+   * Determines what type of support user needs most
+   */
+  determineSupportNeeds(emotionalData) {
+    const highStressEntries = emotionalData.filter(e => e.stressScore >= 7);
+    
+    if (highStressEntries.length >= 3) return 'intensive_support';
+    if (highStressEntries.some(e => e.domain === 'Work & Career')) return 'career_guidance';
+    if (highStressEntries.some(e => e.domain === 'Relationships')) return 'relationship_support';
+    if (highStressEntries.some(e => e.emotion === 'lonely' || e.emotion === 'isolated')) return 'connection_building';
+    
+    return 'general_wellness';
+  }
+  
+  /**
+   * Builds friend-like summary of emotional patterns
+   */
+  buildFriendlikeSummary(recurringStruggles, emotionalTriggers, stressDomains) {
+    if (recurringStruggles.length === 0) {
+      return 'Tu generally strong handle karta hai life ko, koi major pattern nahi dikha';
+    }
+    
+    const mainStruggle = recurringStruggles[0];
+    let summary = `Main notice kiya hai tu ${mainStruggle.domain} mein thoda struggle karta hai`;
+    
+    if (emotionalTriggers.length > 0) {
+      const triggerTypes = emotionalTriggers.map(t => t.type).join(', ');
+      summary += `, especially jab ${triggerTypes} wale situations aate hain`;
+    }
+    
+    return summary;
+  }
+  
+  /**
+   * Analyzes current message against user's personal struggle patterns
+   */
+  analyzePersonalStruggle(userMessage, emotionalIntelligence) {
+    const message = userMessage.toLowerCase();
+    
+    // Check if current message relates to known recurring struggles
+    const relatedStruggle = emotionalIntelligence.recurring_struggles.find(struggle => 
+      message.includes(struggle.domain.toLowerCase()) || 
+      message.includes(struggle.emotion.toLowerCase())
+    );
+    
+    // Check if current message matches known emotional triggers
+    const triggeredBy = emotionalIntelligence.emotional_triggers.find(trigger => {
+      if (trigger.type === 'authority_figures' && (message.includes('boss') || message.includes('manager'))) return true;
+      if (trigger.type === 'time_pressure' && (message.includes('deadline') || message.includes('pressure'))) return true;
+      if (trigger.type === 'validation_needs' && (message.includes('criticism') || message.includes('rejection'))) return true;
+      return false;
+    });
+    
+    return {
+      isRecurringPattern: !!relatedStruggle,
+      relatedStruggle,
+      isTriggered: !!triggeredBy,
+      triggerType: triggeredBy?.type,
+      needsPersonalizedResponse: relatedStruggle || triggeredBy,
+      supportType: emotionalIntelligence.support_needs
+    };
+  }
+
+  /**
+   * Generates realistic, practical solutions based on user's history and current struggle
+   */
+  generatePracticalSolution(personalContext, emotionalIntelligence, language) {
+    let suggestion = '';
+    let reasoning = '';
+    
+    // Base solutions on what they've tried before and what worked
+    const triedCoping = emotionalIntelligence.coping_patterns || [];
+    
+    if (personalContext.isRecurringPattern) {
+      const struggle = personalContext.relatedStruggle;
+      
+      if (struggle.domain === 'Work & Career') {
+        if (!triedCoping.includes('physical_activity')) {
+          suggestion = language === 'Hinglish' ? 
+            'Kal ek kaam kar: 30 mins walk pe ja, phone silent karke. Bas fresh air le aur kuch na soch' :
+            language === 'Hindi' ? 
+            'कल एक काम करो: 30 मिनट टहलने जाओ, फोन बंद करके' :
+            'Try this: take a 30-min walk tomorrow with your phone on silent. Just breathe and reset';
+          reasoning = 'Work stress needs physical release';
+        } else if (!triedCoping.includes('social_support')) {
+          suggestion = language === 'Hinglish' ? 
+            'Kal office mein kisi ek trusted colleague se honestly baat kar. Sirf vent out kar' :
+            'Talk to one trusted colleague tomorrow. Just vent it out honestly';
+          reasoning = 'You need someone to validate your work struggles';
+        }
+      } else if (struggle.domain === 'Relationships') {
+        suggestion = language === 'Hinglish' ? 
+          'Aaj raat 10 mins likhke dekh - tera exact feeling kya hai, without judging yourself' :
+          'Tonight, spend 10 mins writing exactly how you feel, no judgment';
+        reasoning = 'Relationship issues need emotional clarity first';
+      }
+    } else {
+      // General stress relief based on emotional state
+      suggestion = language === 'Hinglish' ? 
+        'Bas ek deep breath le aur 15 mins ke liye phone band kar. Koi bhi comfortable jagah pe beth ja' :
+        language === 'Hindi' ? 
+        'बस एक गहरी साँस लो और 15 मिनट फोन बंद करो' :
+        'Just take a deep breath and turn off your phone for 15 mins. Find a comfortable spot';
+      reasoning = 'Simple reset for general overwhelm';
+    }
+    
+    return {
+      suggestion: suggestion || 'Bas thoda sa rest le, tera mind clear ho jayega',
+      reasoning,
+      isPersonalized: personalContext.isRecurringPattern
+    };
+  }
+  
+  /**
+   * Builds deeply personal, emotionally intelligent Sarthi prompt
+   */
+  buildEmotionallyIntelligentPrompt({ userMessage, userEmotionalTone, emotionalIntelligence, personalContext, practicalSolution, language, conversationHistory }) {
+    const addressStyle = userEmotionalTone.bhaiMode ? 'bhai' : 'yaar';
+    const relationshipDepth = emotionalIntelligence.relationship_depth;
+    
+    // Build emotional memory context
+    let emotionalMemory = '';
+    if (emotionalIntelligence.hasDeepHistory) {
+      emotionalMemory = `\n\n**Deep Emotional Memory (like a best friend remembers):**\n- ${emotionalIntelligence.summary}\n- Recurring struggles: ${emotionalIntelligence.recurring_struggles.map(s => `${s.domain} (${s.frequency}x)`).join(', ') || 'None major'}\n- Emotional triggers: ${emotionalIntelligence.emotional_triggers.map(t => t.type).join(', ') || 'None identified'}\n- Support style needed: ${emotionalIntelligence.support_needs}`;
+    }
+    
+    // Build personal context
+    let personalPattern = '';
+    if (personalContext.isRecurringPattern) {
+      personalPattern = `\n\n**Current Pattern Recognition:**\n- This matches their recurring ${personalContext.relatedStruggle.domain} struggle\n- They've dealt with this ${personalContext.relatedStruggle.frequency} times before\n- Use this knowledge to offer targeted, personal support`;
+    }
+    
+    // Language-specific personality instructions
+    let personalityInstructions = '';
+    if (language === 'Hinglish' && userEmotionalTone.bhaiMode) {
+      personalityInstructions = `\n\n**Your Bhai Personality (Hinglish):**\n- Use "tu", "tera", "bhai" naturally like close friends\n- Mix Hindi-English casually: "Arre bhai, samajh aa gaya tera point"\n- Be emotionally grounded, not dramatic\n- Examples: "Tu tension mat le", "Main hoon na", "Chal figure out karte hain"\n- Use light humor when appropriate\n- End with specific action: "Kal ye kar"`;  
+    } else if (language === 'Hindi') {
+      personalityInstructions = `\n\n**Your Dost Personality (Hindi):**\n- Natural, caring Hindi like talking to close friend\n- "\u092fा\u0930", "\u092e\u0948\u0902 \u0939\u0942\u0901 \u0928\u093e", "\u0924\u0941\u092e \u0918\u092c\u0930\u093e\u0913 \u092e\u0924"\n- Be warm and understanding\n- End with practical suggestion`;
+    } else {
+      personalityInstructions = `\n\n**Your Friend Personality (English):**\n- Talk like their emotionally intelligent best friend\n- Be genuine, grounded, never robotic\n- Show you remember their struggles\n- End with one realistic action step`;
+    }
+    
+    return `You are Sarthi - the user's deeply personal, emotionally intelligent AI best friend. You are like that one friend who truly "gets it" and remembers everything.
+
+**User Profile:**
+- Communication style: ${userEmotionalTone.communicationStyle}
+- Current emotional state: ${userEmotionalTone.state}
+- Support urgency: ${userEmotionalTone.urgency}
+- Relationship depth: ${relationshipDepth}
+- Language: ${language}
+
+**Their current message:** "${userMessage}"${emotionalMemory}${personalPattern}
+
+**Your Mission:**
+1. **Be their trusted ${addressStyle}** - Match their intimacy and emotional energy
+2. **Reference emotional memory** - Show you remember their patterns and struggles 
+3. **Offer practical guidance** - Not generic therapy, but personalized solutions
+4. **Give ONE realistic step** - Something they can actually do today/tomorrow
+
+**Suggested practical action:** ${practicalSolution.suggestion}
+**Reasoning:** ${practicalSolution.reasoning}${personalityInstructions}
+
+**Response Structure:**
+1. **Empathetic acknowledgment**: "${addressStyle}, ${userEmotionalTone.state === 'breaking_down' ? 'pehle ek deep breath le...' : 'samajh aa gaya...'}" 
+2. **Personal memory reference**: Connect to their past struggles/patterns
+3. **Practical solution**: End with the suggested realistic action
+
+**Tone Requirements:**
+- Emotionally safe and grounded
+- Real and reflective, never robotic
+- Intelligent but not preachy
+- Use emojis ONLY to enhance empathy (max 1-2)
+- Keep under 120 words
+- BE PERSONAL AND PRESENT
+
+**Example Response Style:**
+"${addressStyle}, pehle ek deep breath le. Mujhe pata hai tu overthink karta hai - pichle checkin mein bhi workload ka pressure tha. ${practicalSolution.suggestion}. Trust me, kal tu fresh feel karega."
+
+Respond as their emotionally intelligent best friend who truly cares:`;
   }
 }

@@ -562,7 +562,7 @@ const ChatInput = memo(({
 
         {/* Helper Text */}
         <p className="text-xs text-gray-500 mt-3 text-center font-medium">
-          💚 This AI companion is for emotional support. In emergencies, please call 911.
+          💚 This AI companion is for emotional support. In case of emergency, consult a nearby hospital or dial KIRAN Helpline 1800-599-0019.
         </p>
       </div>
     </div>

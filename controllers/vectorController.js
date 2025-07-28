@@ -33,7 +33,7 @@ export const querySimilarVectorsHandler = async (req, res) => {
 
     console.log('🔧 Pinecone config:', { environment, indexName });
 
-    const pinecone = new Pinecone({ apiKey });
+    const pinecone = new Pinecone();
 
     // Try to get the index
     let index;
@@ -42,12 +42,9 @@ export const querySimilarVectorsHandler = async (req, res) => {
       console.log('✅ Pinecone index accessed successfully');
     } catch (indexError) {
       console.error('❌ Failed to access Pinecone index:', indexError.message);
-      console.log('🔄 Returning mock response (index not available)');
-      return res.status(200).json({ 
-        matches: [],
-        message: `No similar vectors found (Pinecone index '${indexName}' not available)`,
-        mock: true,
-        suggestion: 'Create the index in Pinecone console or use a different index name'
+      return res.status(500).json({
+        error: 'Pinecone index not accessible',
+        message: indexError.message
       });
     }
 
@@ -84,11 +81,9 @@ export const querySimilarVectorsHandler = async (req, res) => {
       });
     } catch (queryError) {
       console.error('❌ Vector query failed:', queryError.message);
-      console.log('🔄 Returning mock response (query failed)');
-      return res.status(200).json({ 
-        matches: [],
-        message: 'No similar vectors found (Pinecone query failed)',
-        mock: true 
+      return res.status(500).json({
+        error: 'Vector query failed',
+        message: queryError.message
       });
     }
 
@@ -96,11 +91,9 @@ export const querySimilarVectorsHandler = async (req, res) => {
     console.error('🔥 Vector query failed:', err.message);
     console.error('🔥 Error details:', err);
     
-    // Return empty results instead of error
-    return res.status(200).json({ 
-      matches: [],
-      message: 'No similar vectors found (fallback mode)',
-      mock: true 
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: err.message
     });
   }
 };
@@ -137,7 +130,7 @@ export const upsertVectorHandler = async (req, res) => {
 
     console.log('🔧 Pinecone config:', { environment, indexName });
 
-    const pinecone = new Pinecone({ apiKey });
+    const pinecone = new Pinecone();
 
     // Try to get the index
     let index;
@@ -146,11 +139,9 @@ export const upsertVectorHandler = async (req, res) => {
       console.log('✅ Pinecone index accessed successfully');
     } catch (indexError) {
       console.error('❌ Failed to access Pinecone index:', indexError.message);
-      console.log('🔄 Returning mock success response (index not available)');
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Vector stored locally (Pinecone index not available)',
-        mock: true 
+      return res.status(500).json({
+        error: 'Pinecone index not accessible',
+        message: indexError.message
       });
     }
 
@@ -193,11 +184,9 @@ export const upsertVectorHandler = async (req, res) => {
 
     } catch (upsertError) {
       console.error('❌ Vector upsert failed:', upsertError.message);
-      console.log('🔄 Returning mock success response (upsert failed)');
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Vector stored locally (Pinecone upsert failed)',
-        mock: true 
+      return res.status(500).json({
+        error: 'Vector upsert failed',
+        message: upsertError.message
       });
     }
 
@@ -205,11 +194,9 @@ export const upsertVectorHandler = async (req, res) => {
     console.error('🔥 Vector upsert failed:', err.message);
     console.error('🔥 Error details:', err);
     
-    // Return success with mock flag instead of error
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Vector stored locally (fallback mode)',
-      mock: true 
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: err.message
     });
   }
 };

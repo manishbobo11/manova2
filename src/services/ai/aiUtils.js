@@ -30,7 +30,7 @@ export const createChatCompletion = async (prompt, options = {}) => {
   const crisisKeywords = ['suicidal', 'kill myself', 'end it all', 'hopeless', 'can\'t go on'];
   
   if (crisisKeywords.some(keyword => lowerPrompt.includes(keyword))) {
-    return "I'm very concerned about what you've shared. Your life has value, and there are people who want to help. Please consider reaching out to a crisis hotline or emergency services. The National Suicide Prevention Lifeline is available 24/7 at 988. You don't have to go through this alone.";
+    return "I'm very concerned about what you've shared. Your life has value, and there are people who want to help. Please consider reaching out to KIRAN Mental Health Helpline at 1800-599-0019 (24/7) or consult a nearby hospital. You don't have to go through this alone.";
   }
   
   return responses[Math.floor(Math.random() * responses.length)];

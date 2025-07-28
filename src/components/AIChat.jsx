@@ -150,13 +150,13 @@ const AIChat = ({ userId }) => {
           </p>
           <div className="space-y-2 text-sm">
             <div className="text-red-800">
-              <strong>National Suicide Prevention Lifeline:</strong> 988
+              <strong>KIRAN Mental Health Helpline:</strong> 1800-599-0019
             </div>
             <div className="text-red-800">
-              <strong>Crisis Text Line:</strong> Text HOME to 741741
+              <strong>Vandrevala Foundation:</strong> +91 9999 666 555
             </div>
             <div className="text-red-800">
-              <strong>Emergency Services:</strong> 911
+              <strong>Emergency:</strong> Consult nearby hospital or call national helpline
             </div>
           </div>
         </div>
@@ -246,7 +246,7 @@ const AIChat = ({ userId }) => {
           </motion.button>
         </div>
         <p className="text-xs text-gray-500 mt-2">
-          This AI assistant is for support and guidance. In case of emergency, please call 911.
+          This AI assistant is for support and guidance. In case of emergency, consult a nearby hospital or dial KIRAN Helpline 1800-599-0019.
         </p>
       </div>
     </div>

@@ -369,13 +369,13 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
           </p>
           <div className="space-y-2 text-base font-medium">
             <div className="text-red-800">
-              <strong>National Suicide Prevention Lifeline:</strong> 988
+              <strong>KIRAN Mental Health Helpline:</strong> 1800-599-0019
             </div>
             <div className="text-red-800">
-              <strong>Crisis Text Line:</strong> Text HOME to 741741
+              <strong>Vandrevala Foundation:</strong> +91 9999 666 555
             </div>
             <div className="text-red-800">
-              <strong>Emergency Services:</strong> 911
+              <strong>Emergency:</strong> Consult nearby hospital or call national helpline
             </div>
           </div>
         </div>

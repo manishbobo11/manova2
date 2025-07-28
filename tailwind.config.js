@@ -262,6 +262,8 @@ export default {
         heading: ["Archivo", "sans-serif"],
         body: ["Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
+        script: ["Dancing Script", "Pacifico", "cursive"],
+        brand: ["Pacifico", "cursive"],
       },
       animation: {
         "float-slow": "float-slow 6s ease-in-out infinite",

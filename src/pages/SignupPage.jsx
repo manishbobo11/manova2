@@ -27,7 +27,7 @@ const SignupPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const { signup, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (field, value) => {
@@ -55,13 +55,25 @@ const SignupPage = () => {
     }
   };
 
-  const handleSocialSignup = (provider) => {
-    // Handle social signup logic here
-    console.log(`Sign up with ${provider}`);
+  const handleSocialSignup = async (provider) => {
+    if (provider === 'google') {
+      try {
+        setError("");
+        setLoading(true);
+        await signInWithGoogle();
+        navigate("/home");
+      } catch (error) {
+        setError("Failed to sign up with Google. Please try again.");
+        console.error("Google signup error:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   // Add CSS variables on component mount
   useEffect(() => {
+    document.title = 'Manova | Sign Up';
     const style = document.createElement("style");
     style.textContent = cssVars;
     document.head.appendChild(style);
@@ -69,80 +81,144 @@ const SignupPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header Navigation */}
-      <header className="w-full h-[67px] border-b border-[#D8D8D8] bg-white">
-        <div className="max-w-[1440px] mx-auto px-4 h-full flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center lg:ml-[120px] ml-4">
-            <img
-              src="https://api.builder.io/api/v1/image/assets/TEMP/5ebf8fe158a56247114d04d0e248d741c275f54a?width=70"
-              alt="Manova Logo"
-              className="w-[35px] h-[35px] mr-3"
-            />
-            <span className="text-[20px] font-semibold text-black font-inter leading-normal">
-              Manova
-            </span>
-          </div>
+      <div className="flex items-center justify-center min-h-screen bg-white relative overflow-hidden">
+        {/* Animated Background Particles */}
+        <motion.div
+          className="w-2 h-2 bg-blue-300 rounded-full absolute top-10 left-10 opacity-60"
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        />
+        <motion.div
+          className="w-1 h-1 bg-purple-300 rounded-full absolute top-20 right-20 opacity-60"
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
+        />
+        <motion.div
+          className="w-1.5 h-1.5 bg-indigo-300 rounded-full absolute bottom-20 left-20 opacity-60"
+          animate={{ y: [0, 12, 0] }}
+          transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+        />
+        <motion.div
+          className="w-1 h-1 bg-blue-200 rounded-full absolute bottom-10 right-10 opacity-60"
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, delay: 1.5 }}
+        />
 
-          {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-[50px]">
-            <Link
-              to="/"
-              className="text-[16px] font-bold text-[#007CFF] font-inter"
-            >
-              Home
-            </Link>
-            <Link
-              to="/about"
-              className="text-[16px] font-bold text-black hover:text-[#007CFF] transition-colors font-inter"
-            >
-              About
-            </Link>
-            <Link
-              to="/how-it-works"
-              className="text-[16px] font-bold text-black hover:text-[#007CFF] transition-colors font-inter"
-            >
-              How it work
-            </Link>
-            <Link
-              to="/community"
-              className="text-[16px] font-bold text-black hover:text-[#007CFF] transition-colors font-inter"
-            >
-              Community
-            </Link>
-            <Link
-              to="/support"
-              className="text-[16px] font-bold text-black hover:text-[#007CFF] transition-colors font-inter"
-            >
-              Support
-            </Link>
-          </nav>
-
-          {/* Login Button */}
-          <div className="flex items-center lg:mr-[120px] mr-4">
-            <Link
-              to="/login"
-              className="inline-flex px-4 py-2 bg-[#007CFF] text-white text-[16px] font-bold rounded-[24px] hover:bg-[#0066CC] transition-colors font-inter w-[79px] h-[35px] items-center justify-center"
-            >
-              Log in
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex-1 flex">
-        <div className="w-full max-w-[1440px] mx-auto relative min-h-[calc(100vh-67px)]">
+        <div className="w-full max-w-[1440px] mx-auto relative min-h-screen">
           <div className="flex items-center w-full h-full">
-            {/* Left Side - Illustration */}
-            <div className="hidden lg:block absolute left-[120px] top-[169px] w-[580px] h-[593px]">
-              <img
-                src="https://api.builder.io/api/v1/image/assets/TEMP/b4cecfeada70c76f5b03d994e22b3b53bd2bcc0b?width=1160"
-                alt="Manova App Illustration"
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {/* Left Side - Animated Logo Section */}
+            <motion.div 
+              className="hidden lg:block absolute left-[120px] top-[80px] w-[680px] h-[680px]"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <div className="relative w-full h-full flex items-center justify-center">
+                {/* Background gradient circle */}
+                <motion.div
+                  className="absolute inset-8 bg-gradient-to-br from-blue-100 via-purple-50 to-blue-50 rounded-full opacity-60"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.6 }}
+                  transition={{ duration: 1.2, ease: "easeOut" }}
+                />
+
+                {/* Floating decorative dots */}
+                <motion.div
+                  className="absolute top-20 left-16 w-4 h-4 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full shadow-lg opacity-70"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.7 }}
+                  transition={{ duration: 0.8, delay: 0.3 }}
+                />
+                <motion.div
+                  className="absolute top-32 right-20 w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full shadow-lg opacity-60"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.6 }}
+                  transition={{ duration: 0.8, delay: 0.5 }}
+                />
+                <motion.div
+                  className="absolute bottom-32 left-20 w-5 h-5 bg-gradient-to-r from-green-400 to-blue-500 rounded-full shadow-lg opacity-80"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.8 }}
+                  transition={{ duration: 0.8, delay: 0.7 }}
+                />
+                <motion.div
+                  className="absolute bottom-24 right-16 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full shadow-lg opacity-70"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.7 }}
+                  transition={{ duration: 0.8, delay: 0.9 }}
+                />
+
+                {/* Main Manova Logo */}
+                <motion.div
+                  className="absolute inset-0 flex justify-center items-center"
+                  initial={{ scale: 0.85, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.6, ease: "easeInOut" }}
+                >
+                  <div className="bg-white rounded-3xl p-6 md:p-8 shadow-[0_0_40px_rgba(173,216,230,0.4)] w-48 sm:w-64 md:w-80 flex items-center justify-center">
+                    <img
+                      src="/logo/manova-logo.png"
+                      alt="Manova"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Floating Feature Tags */}
+                {[
+                  { text: "Secure", color: "from-green-400 to-emerald-500", delay: 0.2 },
+                  { text: "Trusted", color: "from-blue-400 to-blue-600", delay: 0.4 },
+                  { text: "AI-Powered", color: "from-purple-400 to-purple-600", delay: 0.6 },
+                  { text: "24/7 Support", color: "from-orange-400 to-orange-600", delay: 0.8 }
+                ].map((tag, index) => (
+                  <motion.div
+                    key={tag.text}
+                    className={`absolute px-5 py-3 rounded-full bg-gradient-to-r ${tag.color} text-white text-base font-semibold shadow-lg backdrop-blur-sm`}
+                    style={{
+                      top: `${20 + index * 15}%`,
+                      left: index % 2 === 0 ? "10%" : "70%",
+                    }}
+                    initial={{
+                      scale: 0,
+                      opacity: 0,
+                      y: 20,
+                      x: index % 2 === 0 ? -20 : 20,
+                    }}
+                    animate={{
+                      scale: 1,
+                      opacity: 1,
+                      y: 0,
+                      x: 0,
+                    }}
+                    transition={{
+                      duration: 0.8,
+                      delay: tag.delay,
+                      ease: "easeOut",
+                    }}
+                    whileHover={{
+                      scale: 1.1,
+                      y: -5,
+                    }}
+                  >
+                    {tag.text}
+                  </motion.div>
+                ))}
+
+                {/* Additional floating elements */}
+                <motion.div
+                  className="absolute top-1/4 right-1/4 w-2 h-2 bg-gradient-to-r from-pink-400 to-red-500 rounded-full opacity-60"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.6 }}
+                  transition={{ duration: 0.6, delay: 1.1 }}
+                />
+                <motion.div
+                  className="absolute bottom-1/3 left-1/3 w-3 h-3 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full opacity-70"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.7 }}
+                  transition={{ duration: 0.6, delay: 1.3 }}
+                />
+              </div>
+            </motion.div>
 
             {/* Right Side - Signup Form */}
             <div className="lg:absolute lg:right-[152px] lg:top-[138px] lg:w-[439px] lg:h-[607px] w-full max-w-md mx-auto lg:mx-0 px-4 lg:px-0 py-8 lg:py-0">
@@ -152,12 +228,17 @@ const SignupPage = () => {
                 transition={{ duration: 0.6 }}
                 className="w-full h-full"
               >
-                {/* Logo and Title */}
-                <div className="flex justify-center items-center mb-[33px]">
-                  <h1 className="text-[36px] font-bold text-[#007CFF] font-inter text-center leading-normal">
+                {/* Animated Logo and Title */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  className="flex justify-center items-center mb-6"
+                >
+                  <h1 className="text-5xl italic font-script text-[#1e3a8a] text-center">
                     Manova
                   </h1>
-                </div>
+                </motion.div>
 
                 {/* Error Message */}
                 {error && (
@@ -309,16 +390,15 @@ const SignupPage = () => {
                   </div>
                 </div>
 
-                {/* Social Signup Buttons */}
-                <div className="flex justify-center space-x-[37.5px] mt-[20px]">
-                  {/* Google */}
+                {/* Google Sign Up Button */}
+                <div className="flex justify-center mt-[20px]">
                   <motion.button
                     onClick={() => handleSocialSignup("google")}
-                    className="w-[45px] h-[45px] rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center justify-center gap-3 w-full max-w-[280px] h-[50px] bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -336,30 +416,7 @@ const SignupPage = () => {
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                       />
                     </svg>
-                  </motion.button>
-
-                  {/* Facebook */}
-                  <motion.button
-                    onClick={() => handleSocialSignup("facebook")}
-                    className="w-[45px] h-[45px] rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <svg className="w-6 h-6" fill="#1877F2" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                    </svg>
-                  </motion.button>
-
-                  {/* X/Twitter */}
-                  <motion.button
-                    onClick={() => handleSocialSignup("twitter")}
-                    className="w-[45px] h-[45px] rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <svg className="w-5 h-5" fill="#000000" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                    </svg>
+                    <span className="text-gray-700 font-medium">Sign up with Google</span>
                   </motion.button>
                 </div>
 
@@ -380,7 +437,6 @@ const SignupPage = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

@@ -1,30 +1,49 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Sparkles, Brain, Heart, Calendar, Activity, Target, Award,
   MessageCircle, Phone, TrendingUp, TrendingDown, AlertTriangle,
-  RefreshCw, BarChart3, Clock, Plus
+  RefreshCw, BarChart3, Clock, Plus, Users, Star, Globe, X, Download,
+  DollarSign, User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserCheckins } from '../services/userSurveyHistory';
+import { getUserCheckins, getLastCheckin } from '../services/userSurveyHistory';
 import WellnessGraph from '../components/WellnessGraph';
+import WellnessScore from '../components/WellnessScore';
 import SarthiChatbox from '../components/SarthiChatbox';
 import ChatHistoryWidget from '../components/ChatHistoryWidget';
 import TherapistRecommendations from '../components/TherapistRecommendations';
 import TherapistLandingSection from '../components/TherapistLandingSection';
 import { ChatSessionProvider } from '../contexts/ChatSessionContext';
+import html2pdf from 'html2pdf.js';
+
+// CSS variables for exact Figma colors (matching landing page)
+const cssVars = `
+  :root {
+    --primary-blue: #007CFF;
+    --primary-blue-hover: #0066CC;
+    --border-gray: #C5C5C5;
+    --text-gray: #777;
+    --border-light: #D8D8D8;
+  }
+`;
 
 const DashboardPage = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Core state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allCheckins, setAllCheckins] = useState([]);
   const [viewPeriod, setViewPeriod] = useState(30); // 7, 30, or 90 days
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+  const [showPastAssessments, setShowPastAssessments] = useState(false);
+  const [assessmentData, setAssessmentData] = useState(null);
+  const [loadingAssessment, setLoadingAssessment] = useState(false);
   
   // Derived state for current wellness status
   const [currentWellness, setCurrentWellness] = useState({
@@ -38,6 +57,14 @@ const DashboardPage = () => {
   const [resumeSessionId, setResumeSessionId] = useState(null);
   const newChatFunctionRef = useRef(null);
 
+  // Add CSS variables on component mount
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = cssVars;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   // Handle resuming a chat session
   const handleResumeChat = (sessionId) => {
     console.log('🔄 Resuming chat session:', sessionId);
@@ -45,13 +72,31 @@ const DashboardPage = () => {
     setShowChatbot(true);
   };
 
-  // Daily goals (static for now as requested)
-  const dailyGoals = [
-    { id: 1, text: '10 minutes meditation', icon: Brain },
-    { id: 2, text: 'Gratitude journaling', icon: Heart },
-    { id: 3, text: '30 minutes walk', icon: Activity },
-    { id: 4, text: 'Connect with a friend', icon: MessageCircle }
-  ];
+  // Dynamic daily goals based on user's wellness level
+  const dailyGoals = useMemo(() => {
+    const goals = [];
+    
+    // Base goals for everyone
+    goals.push({ id: 1, text: 'Take 5 deep breaths', icon: Brain, completed: false });
+    
+    // Wellness-based goals
+    if (currentWellness.score < 6) {
+      goals.push({ id: 2, text: 'Connect with someone you trust', icon: MessageCircle, completed: false });
+      goals.push({ id: 3, text: '10 minutes of self-care', icon: Heart, completed: false });
+              } else {
+      goals.push({ id: 2, text: 'Practice gratitude for 3 things', icon: Heart, completed: false });
+      goals.push({ id: 3, text: '15 minutes physical activity', icon: Activity, completed: false });
+    }
+    
+    // Mood-based goals
+    if (currentWellness.mood === 'very stressed' || currentWellness.mood === 'stressed') {
+      goals.push({ id: 4, text: 'Take a calming break', icon: Clock, completed: false });
+            } else {
+      goals.push({ id: 4, text: 'Try something new today', icon: Star, completed: false });
+    }
+    
+    return goals;
+  }, [currentWellness.score, currentWellness.mood]);
 
   // Helper functions for wellness calculations
   const calculateWellnessScore = (responses) => {
@@ -103,254 +148,230 @@ const DashboardPage = () => {
     }
   };
 
-  // Memoized calculations for performance
+  // Historical metrics calculation
   const historicalMetrics = useMemo(() => {
-    try {
-      if (!allCheckins || allCheckins.length === 0) {
-        return {
-          avgWellness: 0,
-          avgStress: 0,
-          totalCheckins: 0,
-          stabilityScore: 0,
-          checkInRate30d: 0,
-          hasData: false
-        };
-      }
-
-      // Calculate wellness and stress scores for all check-ins
-      const wellnessScores = allCheckins
-        .map(checkin => calculateWellnessScore(checkin.responses))
-        .filter(score => score > 0);
-      
-      const stressScores = allCheckins
-        .map(checkin => calculateStressScore(checkin.responses))
-        .filter(score => score >= 0);
-
-      // Calculate averages from ALL check-ins
-      const avgWellness = wellnessScores.length > 0 ? 
-        wellnessScores.reduce((a, b) => a + b, 0) / wellnessScores.length : 0;
-      
-      const avgStress = stressScores.length > 0 ? 
-        stressScores.reduce((a, b) => a + b, 0) / stressScores.length : 0;
-      
-      // Calculate stability (consistency) from wellness scores
-      let stabilityScore = 0;
-      if (wellnessScores.length > 1) {
-        const mean = avgWellness;
-        const variance = wellnessScores.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / wellnessScores.length;
-        stabilityScore = Math.max(0, 100 - (variance * 10));
-      } else if (wellnessScores.length === 1) {
-        stabilityScore = 100; // Perfect stability with one data point
-      }
-
-      // Calculate 30-day check-in rate
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const recent30dCheckins = allCheckins.filter(checkin => {
-        const checkinDate = checkin.timestamp?.toDate ? 
-          checkin.timestamp.toDate() : 
-          new Date(checkin.timestamp);
-        return checkinDate >= thirtyDaysAgo;
-      });
-      const checkInRate30d = Math.min(100, Math.round((recent30dCheckins.length / 30) * 100));
-
+    if (!allCheckins || allCheckins.length === 0) {
       return {
-        avgWellness: Math.round(avgWellness * 10) / 10,
-        avgStress: Math.round(avgStress * 10) / 10,
-        totalCheckins: allCheckins.length,
-        stabilityScore: Math.round(stabilityScore),
-        checkInRate30d,
-        hasData: allCheckins.length > 0
-      };
-    } catch (err) {
-      console.warn('Error calculating historical metrics:', err);
-      return {
+        hasData: false,
+        totalCheckins: 0,
         avgWellness: 0,
         avgStress: 0,
-        totalCheckins: 0,
-        stabilityScore: 0,
         checkInRate30d: 0,
-        hasData: false
+        stabilityScore: 0
       };
     }
+
+    const totalCheckins = allCheckins.length;
+    
+    // Calculate average wellness with fallback calculation
+    const validWellnessScores = allCheckins.map(checkin => {
+      let score = checkin.wellnessScore;
+      if (!score && checkin.responses) {
+        // Calculate from responses if wellness score is missing
+        score = calculateWellnessScore(checkin.responses);
+      }
+      return score || 0;
+    });
+    
+    const avgWellness = Math.round(
+      validWellnessScores.reduce((sum, score) => sum + score, 0) / totalCheckins
+    );
+    
+    const avgStress = Math.round(
+      allCheckins.reduce((sum, checkin) => sum + (checkin.stressScore || 0), 0) / totalCheckins * 10
+    ) / 10;
+    
+    // Calculate 30-day check-in rate
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentCheckins = allCheckins.filter(checkin => 
+      new Date(checkin.timestamp) > thirtyDaysAgo
+    );
+    const checkInRate30d = Math.round((recentCheckins.length / 30) * 100);
+    
+    // Calculate stability score (consistency in check-ins)
+    const checkinDates = allCheckins.map(c => new Date(c.timestamp).toDateString());
+    const uniqueDates = [...new Set(checkinDates)];
+    const stabilityScore = Math.round((uniqueDates.length / Math.max(1, totalCheckins)) * 100);
+
+            return {
+      hasData: true,
+      totalCheckins,
+      avgWellness,
+      avgStress,
+      checkInRate30d,
+      stabilityScore
+    };
   }, [allCheckins]);
 
-  // Memoized filtered check-ins for view period
+  // Filter checkins based on view period and ensure they have wellness scores
   const filteredCheckins = useMemo(() => {
-    try {
-      if (!allCheckins || allCheckins.length === 0) return [];
-      
-      const now = new Date();
-      const cutoffDate = new Date(now.getTime() - viewPeriod * 24 * 60 * 60 * 1000);
-      
-      return allCheckins
-        .filter(checkin => {
-          const checkinDate = checkin.timestamp?.toDate ? 
-            checkin.timestamp.toDate() : 
-            new Date(checkin.timestamp);
-          return checkinDate >= cutoffDate;
-        })
-        .sort((a, b) => {
-          const aTime = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
-          const bTime = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
-          return aTime - bTime; // Ascending order for proper trend display
-        });
-    } catch (err) {
-      console.warn('Error filtering check-ins:', err);
-      return [];
-    }
+    if (!allCheckins || allCheckins.length === 0) return [];
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - viewPeriod);
+    
+    return allCheckins
+      .filter(checkin => new Date(checkin.timestamp) >= cutoffDate)
+      .map(checkin => {
+        // Ensure each checkin has a wellness score for graph display
+        let wellnessScore = checkin.wellnessScore;
+        if (!wellnessScore && checkin.responses) {
+          wellnessScore = calculateWellnessScore(checkin.responses);
+        }
+        return {
+          ...checkin,
+          wellnessScore: wellnessScore || 0
+        };
+      })
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   }, [allCheckins, viewPeriod]);
 
-  // Memoized AI insights based on last N check-ins
+  // AI Insights based on real user data patterns
   const aiInsights = useMemo(() => {
-    try {
-      if (!allCheckins || allCheckins.length === 0) return null;
-      
-      // Use last 3 check-ins for insights, or all if less than 3
-      const recentCheckins = allCheckins.slice(0, Math.min(3, allCheckins.length));
-      
-      // Calculate average wellness from recent check-ins
-      const recentWellnessScores = recentCheckins
-        .map(checkin => calculateWellnessScore(checkin.responses))
-        .filter(score => score > 0);
-      
-      if (recentWellnessScores.length === 0) return null;
-      
-      const avgRecentWellness = recentWellnessScores.reduce((a, b) => a + b, 0) / recentWellnessScores.length;
-      
-      let insight = '';
-      let recommendations = [];
-      
-      if (avgRecentWellness >= 8) {
-        insight = "Your recent check-ins show excellent mental wellness! You're demonstrating strong emotional resilience and effective stress management strategies.";
-        recommendations = ['Mindfulness', 'Social Connection', 'Maintain Routine'];
-      } else if (avgRecentWellness >= 6) {
-        insight = "Your wellness scores are in a good range. Your recent patterns suggest you're managing well overall, with some minor areas for growth.";
-        recommendations = ['Exercise', 'Sleep Hygiene', 'Stress Management'];
-      } else if (avgRecentWellness >= 4) {
-        insight = "Your recent responses indicate some areas that could benefit from focused attention. Consider implementing structured self-care routines.";
-        recommendations = ['Mindfulness', 'Exercise', 'Social Connection', 'Professional Support'];
-      } else {
-        insight = "Your recent check-ins indicate significant stress levels. It's important to prioritize your mental health and consider professional support.";
-        recommendations = ['Professional Support', 'Crisis Resources', 'Mindfulness', 'Social Connection'];
+    if (!historicalMetrics.hasData) return null;
+    
+    const { avgWellness, avgStress, totalCheckins, checkInRate30d } = historicalMetrics;
+    let insight = '';
+    let recommendations = [];
+    
+    // Generate insights based on actual data patterns
+    if (avgWellness >= 8) {
+      insight = `You're maintaining excellent wellness! Your average score of ${avgWellness}/10 across ${totalCheckins} check-ins shows strong emotional regulation.`;
+      recommendations = ['Maintain current routine', 'Help others with your experience', 'Set new growth goals'];
+    } else if (avgWellness >= 6) {
+      insight = `Your wellness journey shows solid progress with an average of ${avgWellness}/10. You're building good habits with ${totalCheckins} total check-ins.`;
+      recommendations = ['Strengthen daily practices', 'Explore new wellness areas', 'Track what works best'];
+    } else if (avgWellness >= 4) {
+      insight = `Your check-ins show you're working on improvement. With ${totalCheckins} data points, we can see patterns to build on.`;
+      recommendations = ['Focus on stress management', 'Build consistent routines', 'Consider professional support'];
+    } else {
+      insight = `Your ${totalCheckins} check-ins show you're taking important steps. Every check-in helps build awareness and growth.`;
+      recommendations = ['Prioritize self-care', 'Reach out for support', 'Celebrate small wins'];
+    }
+    
+    // Add specific insights based on patterns
+    if (checkInRate30d < 30) {
+      recommendations.push('Try weekly check-ins');
+    }
+    
+    // Analyze recent trends from actual data
+    if (filteredCheckins.length >= 2) {
+      const recent = filteredCheckins.slice(-2);
+      const trend = recent[1].wellnessScore - recent[0].wellnessScore;
+      if (trend > 1) {
+        insight += ' Your recent trend shows positive improvement!';
+      } else if (trend < -1) {
+        recommendations.unshift('Focus on recent challenges');
       }
-      
-      return {
-        insight,
-        recommendations,
-        basedOnCheckins: recentCheckins.length,
-        avgScore: Math.round(avgRecentWellness * 10) / 10
-      };
-    } catch (err) {
-      console.warn('Error generating AI insights:', err);
-      return null;
     }
-  }, [allCheckins]);
+    
+    return {
+      insight,
+      recommendations: recommendations.slice(0, 3), // Limit to 3 recommendations
+      basedOnCheckins: totalCheckins,
+      avgScore: avgWellness,
+      avgStress,
+      trendAnalysis: filteredCheckins.length >= 2
+    };
+  }, [historicalMetrics, filteredCheckins]);
 
-  // User display helpers
+  // Helper functions
   const getUserDisplayName = () => {
-    if (currentUser?.displayName) return currentUser.displayName;
-    if (currentUser?.email) {
-      const emailName = currentUser.email.split('@')[0];
-      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
-    }
-    return 'User';
+    if (!currentUser) return 'User';
+    return currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
   };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    const userName = getUserDisplayName();
-    if (hour < 12) return `Good morning, ${userName}! ☀️`;
-    if (hour < 17) return `Good afternoon, ${userName}! 🌤️`;
-    return `Good evening, ${userName}! 🌙`;
+    const name = getUserDisplayName();
+    
+    if (hour < 12) return `Good morning, ${name}`;
+    if (hour < 17) return `Good afternoon, ${name}`;
+    return `Good evening, ${name}`;
   };
 
-  // Load full check-in array from Firestore
-  const loadAllCheckins = async () => {
+  const loadAllCheckins = async (forceRefresh = false) => {
+    if (!currentUser?.uid) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
+      console.log(`🔄 Loading check-ins for user ${currentUser.uid}${forceRefresh ? ' (forced refresh)' : ''}`);
+      const checkins = await getUserCheckins(currentUser.uid);
+      console.log(`✅ Loaded ${checkins.length} check-ins`);
       
-      if (!currentUser?.uid) {
-        throw new Error('User not authenticated');
-      }
-
-      console.log('📊 Loading full check-in history for user:', currentUser.uid);
+      setAllCheckins(checkins);
+      setLastUpdated(new Date());
       
-      const checkinsData = await getUserCheckins(currentUser.uid);
-      
-      if (!Array.isArray(checkinsData)) {
-        console.warn('Invalid check-ins data format:', checkinsData);
-        setAllCheckins([]);
-        return;
-      }
-
-      // Sort check-ins by timestamp (newest first)
-      const sortedCheckins = checkinsData.sort((a, b) => {
-        const aTime = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
-        const bTime = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
-        return bTime - aTime;
-      });
-
-      setAllCheckins(sortedCheckins);
-      console.log(`✅ Loaded ${sortedCheckins.length} total check-ins`);
-
-      // Set current wellness state from latest check-in
-      if (sortedCheckins.length > 0) {
+      // Calculate current wellness from most recent check-in
+      if (checkins && checkins.length > 0) {
+        // Sort checkins by timestamp to get the most recent one
+        const sortedCheckins = checkins.sort((a, b) => 
+          new Date(b.timestamp) - new Date(a.timestamp)
+        );
         const latestCheckin = sortedCheckins[0];
-        if (latestCheckin.responses) {
-          const score = calculateWellnessScore(latestCheckin.responses);
-          const mood = analyzeMood(latestCheckin.responses);
-          const lastDate = latestCheckin.timestamp?.toDate ? 
-            latestCheckin.timestamp.toDate() : 
-            new Date(latestCheckin.timestamp);
-          
-          setCurrentWellness({
-            score,
-            mood,
-            lastCheckinDate: lastDate
-          });
-        }
-      } else {
-        setCurrentWellness({
-          score: 0,
-          mood: 'neutral',
-          lastCheckinDate: null
+        
+        // Debug logging to inspect the data structure
+        console.log('🔍 Latest check-in structure:', {
+          id: latestCheckin.id,
+          timestamp: latestCheckin.timestamp,
+          wellnessScore: latestCheckin.wellnessScore,
+          stressScore: latestCheckin.stressScore,
+          mood: latestCheckin.mood,
+          hasResponses: !!latestCheckin.responses,
+          keys: Object.keys(latestCheckin)
         });
+        
+        // Calculate wellness score if not available (for backward compatibility)
+        let wellnessScore = latestCheckin.wellnessScore;
+        if (!wellnessScore && latestCheckin.responses) {
+          // Calculate from responses if wellness score is missing
+          wellnessScore = calculateWellnessScore(latestCheckin.responses);
+          console.log('📊 Calculated wellness score from responses:', wellnessScore);
+        }
+        
+        // Determine mood from various sources
+        let mood = latestCheckin.mood || analyzeMood(latestCheckin.responses) || 'neutral';
+        
+        setCurrentWellness({
+          score: wellnessScore || 0,
+          mood: mood,
+          lastCheckinDate: new Date(latestCheckin.timestamp)
+        });
+        
+        console.log(`📊 Final wellness score set: ${wellnessScore || 0}, mood: ${mood}`);
       }
     } catch (err) {
       console.error('Error loading check-ins:', err);
-      setError(err.message);
-      setAllCheckins([]);
-    } finally {
+      setError('Failed to load your wellness data. Please try again.');
+        } finally {
       setLoading(false);
     }
   };
 
-  // Calculate next check-in date
   const getNextCheckinInfo = () => {
-    if (!currentWellness.lastCheckinDate) return { daysUntil: 0, message: 'Ready now' };
+    if (!currentWellness.lastCheckinDate) {
+      return { daysUntil: 0, message: 'Start your journey' };
+    }
     
-    const nextDate = new Date(currentWellness.lastCheckinDate.getTime() + 7 * 24 * 60 * 60 * 1000);
     const now = new Date();
-    const daysUntil = Math.max(0, Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24)));
+    const lastCheckin = new Date(currentWellness.lastCheckinDate);
+    const daysSince = Math.floor((now - lastCheckin) / (1000 * 60 * 60 * 24));
+    const daysUntil = Math.max(0, 7 - daysSince);
     
-    return {
-      daysUntil,
-      message: daysUntil > 0 ? 'Stay consistent!' : 'Ready now'
-    };
+    if (daysUntil === 0) {
+      return { daysUntil: 0, message: 'Due today' };
+    } else if (daysUntil === 1) {
+      return { daysUntil: 1, message: 'Due tomorrow' };
+          } else {
+      return { daysUntil, message: `${daysUntil} days away` };
+    }
   };
 
-  const nextCheckinInfo = getNextCheckinInfo();
-
-  // Load data on component mount
-  useEffect(() => {
-    loadAllCheckins();
-  }, [currentUser?.uid]);
-
-  // Mood emoji mapping
   const getMoodEmoji = (mood) => {
-    const emojiMap = {
+    const moodEmojis = {
       'very stressed': '😰',
       'stressed': '😟',
       'moderate': '😐',
@@ -358,649 +379,944 @@ const DashboardPage = () => {
       'positive': '😊',
       'neutral': '😐'
     };
-    return emojiMap[mood] || '😐';
+    return moodEmojis[mood] || '😐';
   };
 
-  // Emotion-matching accent colors
   const getWellnessColors = (score, mood) => {
-    if (score >= 8 || mood === 'positive' || mood === 'managing well') {
-      return 'from-emerald-500 to-teal-600'; // Green for positive
-    } else if (score >= 6 || mood === 'moderate') {
-      return 'from-amber-500 to-orange-600'; // Orange for moderate
-    } else if (mood === 'stressed' || mood === 'very stressed') {
-      return 'from-rose-500 to-red-600'; // Red for stressed
+    if (score >= 8) return 'from-emerald-500 to-green-600';
+    if (score >= 6) return 'from-blue-500 to-indigo-600';
+    if (score >= 4) return 'from-yellow-500 to-orange-600';
+    return 'from-red-500 to-pink-600';
+  };
+
+  // Function to format responses for domain scores (matches WellnessSurvey logic)
+  const formatResponsesForWellnessScore = (responses, domainResponses) => {
+    const domains = [
+      { name: "Work & Career", icon: Activity },
+      { name: "Personal Life", icon: Heart },
+      { name: "Financial Stress", icon: DollarSign },
+      { name: "Health", icon: Activity },
+      { name: "Self-Worth & Identity", icon: User }
+    ];
+
+    if (domainResponses) {
+      // Use domain responses if available
+      return domains.map(domain => {
+        const score = domainResponses[domain.name];
+        return {
+          domain: domain.name,
+          score: Number(score) * 25 // Convert 0-4 scale to 0-100 percentage
+        };
+      }).filter(item => item.score !== undefined);
+    } else if (responses) {
+      // Fallback: calculate from raw responses
+      const responseValues = Object.values(responses).map(v => Number(v || 0));
+      const questionsPerDomain = Math.ceil(responseValues.length / domains.length);
+      
+      return domains.map((domain, domainIndex) => {
+        const startIndex = domainIndex * questionsPerDomain;
+        const endIndex = Math.min(startIndex + questionsPerDomain, responseValues.length);
+        const domainResponses = responseValues.slice(startIndex, endIndex);
+        
+        if (domainResponses.length === 0) return null;
+        
+        const avgResponse = domainResponses.reduce((sum, val) => sum + val, 0) / domainResponses.length;
+        const stressScore = (avgResponse / 4) * 100; // Convert 0-4 to 0-100
+        
+        return {
+          domain: domain.name,
+          score: Math.round(stressScore)
+        };
+      }).filter(Boolean);
+    }
+    
+    return [];
+  };
+
+  // Function to generate recommendations based on domain scores
+  const generateRecommendations = (domainScores, overallScore) => {
+    const recommendations = [];
+    const sortedDomains = domainScores.sort((a, b) => b.score - a.score);
+    const topStressDomain = sortedDomains[0];
+    
+    if (overallScore < 4) {
+      recommendations.push(`Your assessment indicates significant stress levels. Consider reaching out for professional support to develop personalized coping strategies.`);
+      recommendations.push(`Focus on ${topStressDomain.domain} as your primary area of concern - this domain shows the highest stress levels.`);
+    } else if (overallScore < 6) {
+      recommendations.push(`Your wellness assessment shows some areas needing attention. Consider focusing on stress management techniques for ${topStressDomain.domain}.`);
+      recommendations.push(`Explore mindfulness practices, regular exercise, or talking to a counselor to improve your overall well-being.`);
+    } else if (overallScore < 8) {
+      recommendations.push(`You're managing well overall! Pay attention to ${topStressDomain.domain} to maintain your positive wellness trajectory.`);
+      recommendations.push(`Continue your current wellness practices and consider building stronger daily routines.`);
     } else {
-      return 'from-slate-500 to-gray-600'; // Gray for neutral/tired
+      recommendations.push(`Excellent wellness management! You're thriving across most life domains.`);
+      recommendations.push(`Maintain your current strategies and consider sharing your success with others who might benefit.`);
+    }
+    
+    return recommendations;
+  };
+
+  // Function to generate summary message
+  const generateSummaryMessage = (overallScore, topConcerns) => {
+    if (overallScore >= 8) {
+      return `🎉 Outstanding! You're maintaining exceptional wellness across all life domains. Your stress management strategies are highly effective, and you're demonstrating remarkable emotional resilience. Keep up the excellent work!`;
+    } else if (overallScore >= 6) {
+      return `✨ Great progress! You're managing your wellness effectively overall. Consider focusing your attention on the domains showing higher stress levels - small improvements here can significantly enhance your overall well-being.`;
+    } else if (overallScore >= 4) {
+      return `💡 Your assessment reveals some areas requiring attention. This is completely normal and shows great self-awareness. Consider exploring additional stress management techniques and don't hesitate to seek support when needed.`;
+    } else {
+      return `🤝 Your assessment indicates elevated stress levels across multiple life areas. This takes courage to acknowledge. Professional support can be incredibly valuable in developing personalized coping strategies and building resilience.`;
     }
   };
 
-  // Premium Loading state
+  // Function to handle viewing past assessments with real-time data fetching
+  const handleViewPastAssessments = async () => {
+    if (!currentUser?.uid) {
+      console.error('No user ID available');
+      return;
+    }
+
+    setLoadingAssessment(true);
+    
+    try {
+      console.log('🔄 Fetching latest check-in data for assessment...');
+      
+      // Fetch the most recent check-in data
+      const latestCheckin = await getLastCheckin(currentUser.uid);
+      
+      if (!latestCheckin) {
+        console.warn('No check-in data found');
+        setAssessmentData(null);
+        setShowPastAssessments(true);
+        setLoadingAssessment(false);
+        return;
+      }
+
+      console.log('✅ Latest check-in data fetched:', {
+        timestamp: latestCheckin.timestamp,
+        wellnessScore: latestCheckin.wellnessScore,
+        hasDomainResponses: !!latestCheckin.domainResponses,
+        hasResponses: !!latestCheckin.responses
+      });
+      
+      // Format domain scores for WellnessScore component
+      const domainScores = formatResponsesForWellnessScore(
+        latestCheckin.responses, 
+        latestCheckin.domainResponses
+      );
+      
+      // Calculate wellness score if not available
+      let wellnessScore = latestCheckin.wellnessScore;
+      if (!wellnessScore && latestCheckin.responses) {
+        wellnessScore = calculateWellnessScore(latestCheckin.responses);
+      }
+      
+      // Sort domains by stress level for recommendations
+      const sortedDomains = domainScores.sort((a, b) => b.score - a.score);
+      const topConcerns = sortedDomains.slice(0, 2);
+      
+      // Generate dynamic recommendations and summary
+      const recommendations = generateRecommendations(domainScores, wellnessScore);
+      const summaryMessage = generateSummaryMessage(wellnessScore, topConcerns);
+      
+      // Prepare comprehensive assessment data with real-time values
+      const assessmentData = {
+        // Core data
+        domainScores,
+        overallScore: wellnessScore || 0,
+        mood: latestCheckin.mood || analyzeMood(latestCheckin.responses) || 'Managing Well',
+        checkinDate: new Date(latestCheckin.timestamp),
+        
+        // Enhanced data
+        recommendations,
+        summary: summaryMessage,
+        dominantEmotions: latestCheckin.dominantEmotions || {
+          tone: wellnessScore >= 7 ? 'positive' : wellnessScore >= 5 ? 'neutral' : 'concerned',
+          keywords: topConcerns.map(d => d.domain.toLowerCase().replace(' & ', ' '))
+        },
+        deepDiveSummaries: latestCheckin.deepDiveSummaries || {},
+        
+        // Raw data for reference
+        latestCheckin
+      };
+      
+      console.log('📊 Assessment data prepared:', {
+        domainCount: domainScores.length,
+        overallScore: assessmentData.overallScore,
+        recommendationCount: recommendations.length,
+        hasSummary: !!summaryMessage
+      });
+      
+      setAssessmentData(assessmentData);
+      setShowPastAssessments(true);
+      
+    } catch (error) {
+      console.error('❌ Error fetching assessment data:', error);
+      setError('Failed to load assessment data. Please try again.');
+    } finally {
+      setLoadingAssessment(false);
+    }
+  };
+
+  // PDF download is now handled by the WellnessScore component itself
+
+  // Load data on mount and when user changes
+  useEffect(() => {
+    if (currentUser?.uid) {
+      loadAllCheckins();
+    }
+  }, [currentUser?.uid]);
+
+  // Handle navigation from check-in completion
+  useEffect(() => {
+    if (location.state?.fromCheckin) {
+      console.log('🎯 Detected navigation from check-in, refreshing data...');
+      loadAllCheckins(true); // Force refresh
+      
+      // Show update notification
+      setShowUpdateNotification(true);
+      setTimeout(() => setShowUpdateNotification(false), 4000);
+      
+      // Clear the navigation state to prevent repeated refreshes
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state?.fromCheckin]);
+
+  const nextCheckinInfo = getNextCheckinInfo();
+
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Premium 3D Background Layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
-        
-        {/* Animated background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
-        </div>
-        
-        {/* Main content with backdrop blur */}
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <motion.div 
+          className="text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
           <motion.div 
-            className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 text-center"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-20 h-20 mx-auto mb-8"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          >
+            <div className="absolute inset-0 rounded-full border-4 border-[#D8D8D8]"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-[#007CFF] border-t-transparent"></div>
+          </motion.div>
+          <h2 className="text-2xl font-bold text-black mb-4">Loading your wellness dashboard...</h2>
+          <p className="text-[#777] font-medium">Analyzing your complete check-in history</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+  return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <motion.div 
+          className="bg-white rounded-3xl p-12 shadow-lg border border-[#D8D8D8] text-center max-w-md mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="w-20 h-20 bg-red-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="h-10 w-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-black mb-4">Unable to load dashboard</h2>
+          <p className="text-[#777] mb-6 font-medium">{error}</p>
+          <motion.button 
+            onClick={() => loadAllCheckins(true)}
+            className="bg-[#007CFF] hover:bg-[#0066CC] text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 mx-auto font-bold shadow-lg hover:shadow-xl"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <RefreshCw className="w-5 h-5" />
+            <span>Try Again</span>
+          </motion.button>
+        </motion.div>
+        </div>
+    );
+  }
+
+  // Empty state - no check-ins
+  if (!historicalMetrics.hasData) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-8">
+          <motion.div 
+            className="flex justify-between items-start mb-12"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="bg-white rounded-3xl p-6 shadow-lg border border-[#D8D8D8]">
+              <h1 className="text-4xl font-bold text-black mb-3">{getGreeting()}</h1>
+              <p className="text-[#777] font-medium">{new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
+            </div>
+          <motion.button
+              onClick={() => loadAllCheckins(true)}
+              className="bg-white text-[#777] px-6 py-3 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl"
+              disabled={loading}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              <span className="font-medium">Refresh</span>
+          </motion.button>
+          </motion.div>
+
+          <motion.div
+            className="max-w-4xl mx-auto text-center py-20"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
             <motion.div 
-              className="relative w-20 h-20 mx-auto mb-8"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="bg-white rounded-3xl p-12 shadow-lg border border-[#D8D8D8] relative overflow-hidden group"
+              whileHover={{ y: -4, scale: 1.01 }}
             >
-              <div className="absolute inset-0 rounded-full border-4 border-blue-200/50"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent"></div>
+              <div className="w-20 h-20 bg-[#007CFF] rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <Brain className="h-10 w-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-black mb-6">Start your wellness journey</h2>
+              <p className="text-[#777] mb-8 text-lg leading-relaxed">
+                Complete your first check-in to track your wellness progress and get personalized insights.
+              </p>
+          <motion.button
+                onClick={() => navigate('/survey')}
+                className="bg-[#007CFF] hover:bg-[#0066CC] text-white px-8 py-4 rounded-2xl transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+                Take Your First Check-in
+          </motion.button>
             </motion.div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">Loading your wellness dashboard...</h2>
-            <p className="text-gray-700 font-medium">Analyzing your complete check-in history</p>
           </motion.div>
         </div>
       </div>
     );
   }
 
-  // Premium Error state
-  if (error) {
-    return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Premium 3D Background Layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
-        
-        {/* Animated background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
+  // Main dashboard with data - Clean Professional Design
+  return (
+    <div className="min-h-screen bg-white">
+        {/* Header */}
+      <div className="bg-white border-b border-[#D8D8D8] sticky top-0 z-10">
+        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6">
+        <motion.div 
+            className="flex justify-between items-center"
+            initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+        >
+            <div>
+              <h1 className="text-3xl font-bold text-black mb-2">{getGreeting()}</h1>
+              <p className="text-[#777]">{new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              {currentWellness.lastCheckinDate && (
+                <div className="text-right">
+                  <p className="text-xs text-[#777]">Last check-in</p>
+                  <p className="text-sm font-medium text-black flex items-center">
+                    <Clock className="w-3 h-3 mr-1" />
+                    {currentWellness.lastCheckinDate.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+              
+              <motion.button
+                onClick={() => loadAllCheckins(true)}
+                className="bg-white text-[#777] px-4 py-2 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md"
+                disabled={loading}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="text-sm font-medium">Refresh</span>
+              </motion.button>
+          </div>
+        </motion.div>
         </div>
+      </div>
+
+      {/* Update Notification */}
+      {showUpdateNotification && (
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className="fixed top-24 right-6 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg z-50 flex items-center space-x-3"
+        >
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span className="font-medium">✨ Dashboard updated with your latest check-in!</span>
+        </motion.div>
+      )}
+
+      {/* Main Content */}
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-10">
         
-        {/* Main content with backdrop blur */}
-        <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <motion.div 
-            className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 text-center max-w-md mx-auto"
+        {/* Top Row - 4 Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-8 mb-10">
+          {/* Current Wellness Score */}
+          <motion.div
+            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            whileHover={{ y: -3 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="w-20 h-20 bg-gradient-to-br from-red-400 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-              <AlertTriangle className="h-10 w-10 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-red-900 to-pink-900 bg-clip-text text-transparent mb-4">Unable to load dashboard</h2>
-            <p className="text-gray-700 mb-6 font-medium">{error}</p>
-            <motion.button 
-              onClick={loadAllCheckins}
-              className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 flex items-center space-x-3 mx-auto font-bold shadow-lg hover:shadow-xl"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <RefreshCw className="w-5 h-5" />
-              <span>Try Again</span>
-            </motion.button>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  // Premium Empty state - no check-ins
-  if (!historicalMetrics.hasData) {
-    return (
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Premium 3D Background Layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"></div>
-        
-        {/* Animated background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-pink-400/20 to-orange-400/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-green-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
-        </div>
-        
-        {/* Main content with backdrop blur */}
-        <div className="relative z-10 w-full px-4 sm:px-8 lg:px-16 py-8">
-          <div className="max-w-7xl mx-auto">
-            <motion.div 
-              className="flex justify-between items-start mb-12"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="backdrop-blur-lg bg-white/40 rounded-3xl p-6 shadow-xl border border-white/20">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-3">{getGreeting()}</h1>
-                <p className="text-gray-700 font-medium">{new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}</p>
-              </div>
-              <motion.button 
-                onClick={loadAllCheckins}
-                className="backdrop-blur-lg bg-white/40 text-gray-700 px-6 py-3 rounded-2xl border border-white/20 hover:bg-white/60 transition-all duration-300 flex items-center space-x-3 shadow-xl hover:shadow-2xl"
-                disabled={loading}
-                whileHover={{ scale: 1.05, rotateY: 5 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                <span className="font-medium">Refresh</span>
-              </motion.button>
-            </motion.div>
-
-            <motion.div
-              className="max-w-2xl mx-auto text-center py-20"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <motion.div 
-                className="backdrop-blur-lg bg-white/40 rounded-3xl p-12 shadow-xl border border-white/20 relative overflow-hidden group"
-                whileHover={{ y: -4, scale: 1.01 }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-3xl"></div>
-                <div className="relative z-10">
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
-                    <Brain className="h-10 w-10 text-white" />
-                  </div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-6">Start your wellness journey</h2>
-                  <p className="text-gray-700 mb-8 text-lg leading-relaxed">
-                    Complete your first check-in to track your wellness progress and get personalized insights.
-                  </p>
-                  <motion.button
-                    onClick={() => navigate('/survey')}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-600 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Take Your First Check-in
-                  </motion.button>
-                </div>
-              </motion.div>
-            </motion.div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Main dashboard with data - Full Screen Professional Design
-  return (
-    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#edf4ff] via-[#fef9ff] to-[#e7fdf4] font-inter text-gray-800">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-r from-purple-300/15 to-indigo-300/15 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-gradient-to-r from-teal-300/15 to-cyan-300/15 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-gradient-to-r from-lavender-300/15 to-sky-300/15 rounded-full blur-3xl"></div>
-      </div>
-      
-      {/* Full screen container */}
-      <div className="relative z-10 w-full h-screen flex flex-col">
-        {/* Fixed header bar */}
-        <div className="flex-shrink-0 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-lg">
-          <div className="w-full px-6 lg:px-8 py-4">
-            <motion.div 
-              className="flex justify-between items-center"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div>
-                <h1 className="text-2xl font-semibold bg-gradient-to-r from-indigo-800 to-purple-700 bg-clip-text text-transparent font-inter">{getGreeting()}</h1>
-                <p className="text-sm text-gray-600 mt-1">{new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}</p>
-              </div>
-              <div className="flex items-center space-x-4">
-                {currentWellness.lastCheckinDate && (
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Last check-in</p>
-                    <p className="text-sm font-medium text-gray-700 flex items-center">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {currentWellness.lastCheckinDate.toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Theme Toggle */}
-                <motion.button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="p-2 rounded-xl bg-white/60 backdrop-blur-sm border border-white/30 hover:bg-white/80 transition-all duration-200 shadow-sm hover:shadow-md"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                >
-                  {isDarkMode ? (
-                    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                    </svg>
-                  )}
-                </motion.button>
-
-                <motion.button 
-                  onClick={loadAllCheckins}
-                  className="bg-white/90 text-gray-700 px-4 py-2 rounded-xl border border-gray-200 hover:bg-white transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md hover:scale-105"
-                  disabled={loading}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                  <span className="text-sm font-medium">Refresh</span>
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Scrollable content area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-6">
-            
-            {/* Top Row - 4 Summary Cards */}
-            <div className="grid grid-cols-12 gap-6 mb-6">
-              {/* Current Wellness Score */}
-              <motion.div 
-                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
-                whileHover={{ y: -3, scale: 1.01 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 bg-gradient-to-br ${getWellnessColors(currentWellness.score, currentWellness.mood)} rounded-xl flex items-center justify-center shadow-sm`}>
+              <div className={`w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-sm`}>
                     <Sparkles className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-3xl font-bold text-neutral-900">{currentWellness.score}/10</span>
+              <span className="text-3xl font-bold text-black">{currentWellness.score}/10</span>
                 </div>
-                <h3 className="font-semibold text-gray-700 mb-2">Wellness Score</h3>
-                <p className="text-sm text-gray-600">
-                  {currentWellness.score >= 8 ? 'Excellent state' : 
-                   currentWellness.score >= 6 ? 'Good wellness' : 
-                   currentWellness.score >= 4 ? 'Needs attention' : 'Seek support'}
+            <h3 className="font-semibold text-black mb-2">Wellness Score</h3>
+            <p className="text-sm text-[#777]">
+              {currentWellness.score >= 8 ? 'Excellent state' : 
+               currentWellness.score >= 6 ? 'Good wellness' : 
+               currentWellness.score >= 4 ? 'Needs attention' : 'Seek support'}
                 </p>
               </motion.div>
 
               {/* Current Mood */}
               <motion.div 
-                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
-                whileHover={{ y: -3, scale: 1.01 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
+            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            whileHover={{ y: -3 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 bg-gradient-to-br ${getWellnessColors(currentWellness.score, currentWellness.mood)} rounded-xl flex items-center justify-center shadow-sm`}>
+              <div className="w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-sm">
                     <Heart className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-3xl">{getMoodEmoji(currentWellness.mood)}</span>
+              <span className="text-3xl">{getMoodEmoji(currentWellness.mood)}</span>
                 </div>
-                <h3 className="font-semibold text-gray-700 mb-2">Current Mood</h3>
-                <p className="text-sm text-gray-600 capitalize">
-                  {currentWellness.mood.replace('_', ' ')}
+            <h3 className="font-semibold text-black mb-2">Current Mood</h3>
+            <p className="text-sm text-[#777] capitalize">
+              {currentWellness.mood.replace('_', ' ')}
                 </p>
               </motion.div>
 
-              {/* Check-in Rate */}
+          {/* Check-in Rate */}
               <motion.div 
-                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
-                whileHover={{ y: -3, scale: 1.01 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
+            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            whileHover={{ y: -3 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
+              <div className="w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-sm">
                     <Award className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-3xl font-bold text-neutral-900">{historicalMetrics.checkInRate30d}%</span>
+              <span className="text-3xl font-bold text-black">{historicalMetrics.checkInRate30d}%</span>
                 </div>
-                <h3 className="font-semibold text-gray-700 mb-2">Check-in Rate</h3>
-                <p className="text-sm text-gray-600">Last 30 days</p>
+            <h3 className="font-semibold text-black mb-2">Check-in Rate</h3>
+            <p className="text-sm text-[#777]">Last 30 days</p>
               </motion.div>
 
               {/* Next Check-in */}
               <motion.div 
-                className="col-span-12 sm:col-span-6 lg:col-span-3 rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105"
-                whileHover={{ y: -3, scale: 1.01 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
+            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            whileHover={{ y: -3 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+              <div className="w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-sm">
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-xl font-bold text-neutral-900">
-                    {nextCheckinInfo.daysUntil > 0 ? `${nextCheckinInfo.daysUntil}d` : 'Today'}
+              <span className="text-xl font-bold text-black">
+                {nextCheckinInfo.daysUntil > 0 ? `${nextCheckinInfo.daysUntil}d` : 'Today'}
                   </span>
                 </div>
-                <h3 className="font-semibold text-gray-700 mb-2">Next Check-in</h3>
-                <p className="text-sm text-gray-600">{nextCheckinInfo.message}</p>
+            <h3 className="font-semibold text-black mb-2">Next Check-in</h3>
+            <p className="text-sm text-[#777]">{nextCheckinInfo.message}</p>
               </motion.div>
             </div>
 
-            {/* Middle Section - Main Content + Sidebar */}
-            <div className="grid grid-cols-12 gap-6">
-              {/* Left Column - 75% width (9 columns) */}
-              <div className="col-span-12 xl:col-span-9 space-y-6">
-                
-                {/* Analytics Header */}
-                <motion.div 
-                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-1">Analytics Dashboard</h2>
-                      <p className="text-sm text-gray-600">Track your wellness journey over time</p>
-                    </div>
-                    <div className="flex space-x-2">
-                      {[7, 30, 90].map((period) => (
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-10">
+          {/* Left Column - Main Content */}
+          <div className="xl:col-span-3 space-y-8">
+            
+            {/* Analytics Header */}
+            <motion.div 
+              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+                    <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-black mb-1">Analytics Dashboard</h2>
+                  <p className="text-sm text-[#777]">Track your wellness journey over time</p>
+                </div>
+                      <div className="flex items-center space-x-4">
                         <motion.button
-                          key={period}
-                          onClick={() => setViewPeriod(period)}
-                          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 ${
-                            viewPeriod === period
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          onClick={handleViewPastAssessments}
+                          disabled={loadingAssessment}
+                          className="flex items-center space-x-2 px-4 py-2 bg-white text-[#007CFF] rounded-2xl border border-[#007CFF] hover:bg-blue-50 transition-all duration-300 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50"
+                          whileHover={{ scale: loadingAssessment ? 1 : 1.02 }}
+                          whileTap={{ scale: loadingAssessment ? 1 : 0.98 }}
                         >
-                          {period}d
+                          {loadingAssessment ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-[#007CFF] border-t-transparent rounded-full animate-spin" />
+                              <span>Loading Assessment...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar className="w-4 h-4" />
+                              <span>📅 View Past Assessments</span>
+                            </>
+                          )}
                         </motion.button>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Historical Metrics Grid */}
-                <motion.div 
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                >
-                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Avg Wellness</p>
-                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.avgWellness}</p>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-green-600" />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{historicalMetrics.totalCheckins} check-ins</p>
-                  </div>
-                  
-                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Avg Stress</p>
-                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.avgStress}</p>
-                      </div>
-                      <TrendingDown className="h-8 w-8 text-red-600" />
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">{historicalMetrics.totalCheckins} check-ins</p>
-                  </div>
-                  
-                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Total Data</p>
-                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.totalCheckins}</p>
-                      </div>
-                      <BarChart3 className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">Historic records</p>
-                  </div>
-                  
-                  <div className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-4 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80 hover:scale-105">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase tracking-wide font-medium">Stability</p>
-                        <p className="text-2xl font-bold text-neutral-900">{historicalMetrics.stabilityScore}%</p>
-                      </div>
-                      <Target className="h-8 w-8 text-purple-600" />
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">Consistency</p>
-                  </div>
-                </motion.div>
-
-                {/* Wellness Trends Chart */}
-                {filteredCheckins.length > 0 && (
-                  <motion.div 
-                    className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 }}
-                  >
-                    <div className="p-6">
-                      <div className="flex justify-between items-center mb-6">
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900">
-                            Wellness Trends
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''} • Last {viewPeriod} days
-                          </p>
-                        </div>
-                        <div className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                          Updated {new Date().toLocaleTimeString()}
+                        
+                        <div className="flex space-x-2">
+                  {[7, 30, 90].map((period) => (
+                    <motion.button
+                            key={period}
+                      onClick={() => setViewPeriod(period)}
+                      className={`px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
+                        viewPeriod === period
+                          ? 'bg-[#007CFF] text-white shadow-md'
+                          : 'bg-white text-[#777] hover:bg-gray-50 border border-[#C5C5C5]'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {period}d
+                    </motion.button>
+                        ))}
                         </div>
                       </div>
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <WellnessGraph checkins={filteredCheckins} />
-                      </div>
                     </div>
-                  </motion.div>
+            </motion.div>
+
+            {/* Historical Metrics Grid */}
+            <motion.div 
+              className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-4 transition-all hover:shadow-xl hover:scale-105">
+                        <div className="flex items-center justify-between">
+                          <div>
+                    <p className="text-xs text-[#777] uppercase tracking-wide font-medium">Avg Wellness</p>
+                    <p className="text-2xl font-bold text-black">{historicalMetrics.avgWellness}</p>
+                          </div>
+                  <TrendingUp className="h-8 w-8 text-[#007CFF]" />
+                        </div>
+                <p className="text-xs text-[#777] mt-1">{historicalMetrics.totalCheckins} check-ins</p>
+                      </div>
+              
+              <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-4 transition-all hover:shadow-xl hover:scale-105">
+                        <div className="flex items-center justify-between">
+                          <div>
+                    <p className="text-xs text-[#777] uppercase tracking-wide font-medium">Avg Stress</p>
+                    <p className="text-2xl font-bold text-black">{historicalMetrics.avgStress}</p>
+                          </div>
+                  <TrendingDown className="h-8 w-8 text-[#007CFF]" />
+                        </div>
+                <p className="text-xs text-[#777] mt-1">{historicalMetrics.totalCheckins} check-ins</p>
+                      </div>
+              
+              <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-4 transition-all hover:shadow-xl hover:scale-105">
+                        <div className="flex items-center justify-between">
+                          <div>
+                    <p className="text-xs text-[#777] uppercase tracking-wide font-medium">Total Data</p>
+                    <p className="text-2xl font-bold text-black">{historicalMetrics.totalCheckins}</p>
+                          </div>
+                  <BarChart3 className="h-8 w-8 text-[#007CFF]" />
+                        </div>
+                <p className="text-xs text-[#777] mt-1">Historic records</p>
+                      </div>
+              
+              <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-4 transition-all hover:shadow-xl hover:scale-105">
+                        <div className="flex items-center justify-between">
+                          <div>
+                    <p className="text-xs text-[#777] uppercase tracking-wide font-medium">Stability</p>
+                    <p className="text-2xl font-bold text-black">{historicalMetrics.stabilityScore}%</p>
+                          </div>
+                  <Target className="h-8 w-8 text-[#007CFF]" />
+                        </div>
+                <p className="text-xs text-[#777] mt-1">Consistency</p>
+                      </div>
+            </motion.div>
+
+            {/* Wellness Trends Chart */}
+            {filteredCheckins.length > 0 && (
+              <motion.div 
+                className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-black">
+                        Wellness Trends
+                      </h3>
+                      <p className="text-sm text-[#777] mt-1">
+                        {filteredCheckins.length} check-in{filteredCheckins.length !== 1 ? 's' : ''} • Last {viewPeriod} days
+                      </p>
+                    </div>
+                    <div className="text-xs text-[#777] bg-gray-100 px-3 py-1 rounded-full">
+                      {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading...'}
+                      </div>
+                      </div>
+                  <div className="bg-gray-50 rounded-2xl p-4">
+                    <WellnessGraph checkins={filteredCheckins} />
+                    </div>
+                  </div>
+              </motion.div>
                 )}
 
                 {/* AI Insights */}
-                {aiInsights && (
-                  <motion.div 
-                    className="rounded-xl shadow-lg bg-gradient-to-br from-purple-50/80 to-indigo-50/80 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.4 }}
-                  >
-                    <div className="flex items-center mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                        <Brain className="w-6 h-6 text-white" />
-                      </div>
+            {aiInsights && (
+                <motion.div 
+                className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+                >
+                  <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center mr-3 shadow-md">
+                    <Brain className="w-6 h-6 text-white" />
+                    </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-black">AI Insights</h3>
+                    <p className="text-xs text-[#777]">
+                      Based on {aiInsights.basedOnCheckins} check-ins • Avg: {aiInsights.avgScore}/10
+                    </p>
+                  </div>
+                </div>
+                <p className="text-black mb-4 leading-relaxed">
+                  {aiInsights.insight}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                  {aiInsights.recommendations.map(tag => (
+                    <span 
+                      key={tag} 
+                      className="px-3 py-1 bg-blue-50 rounded-full text-xs font-medium text-[#007CFF] border border-blue-100"
+                    >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </motion.div>
+            )}
+
+            {/* Past Assessments Section - Full Modal/Expandable View */}
+            {showPastAssessments && (
+              <motion.div
+                id="past-assessments-section"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                onClick={() => setShowPastAssessments(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header with Close button */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-[#D8D8D8] flex-shrink-0">
+                    <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">AI Insights</h3>
-                        <p className="text-xs text-gray-600">
-                          Based on {aiInsights.basedOnCheckins} check-ins • Avg: {aiInsights.avgScore}/10
+                        <h3 className="text-3xl font-bold text-black mb-2">
+                          {assessmentData ? (
+                            `Wellness Assessment - ${assessmentData.checkinDate.toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}`
+                          ) : (
+                            'Wellness Assessment'
+                          )}
+                        </h3>
+                        <p className="text-[#777] text-lg">
+                          {loadingAssessment ? (
+                            'Loading your comprehensive wellness evaluation...'
+                          ) : assessmentData ? (
+                            'Your comprehensive wellness evaluation with AI insights and recommendations'
+                          ) : (
+                            'Assessment data from your latest check-in'
+                          )}
                         </p>
                       </div>
+                      <motion.button
+                        onClick={() => setShowPastAssessments(false)}
+                        className="flex items-center justify-center w-12 h-12 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors shadow-lg"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <X className="w-6 h-6 text-gray-600" />
+                      </motion.button>
                     </div>
-                    <p className="text-gray-800 mb-4 leading-relaxed">
-                      {aiInsights.insight}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {aiInsights.recommendations.map(tag => (
-                        <span 
-                          key={tag} 
-                          className="px-3 py-1 bg-white/80 rounded-full text-xs font-medium text-purple-800 shadow-sm"
+                  </div>
+
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto">
+                    {loadingAssessment ? (
+                      // Loading State
+                      <div className="flex items-center justify-center py-20">
+                        <div className="text-center">
+                          <div className="w-16 h-16 border-4 border-[#007CFF] border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                          <h3 className="text-xl font-semibold text-black mb-2">Loading Assessment Data</h3>
+                          <p className="text-[#777]">Fetching your latest wellness check-in...</p>
+                        </div>
+                      </div>
+                    ) : assessmentData && assessmentData.domainScores.length > 0 ? (
+                      // Assessment Data Available
+                      <div className="bg-white">
+                        <div id="wellness-assessment-pdf" className="p-6">
+                          <WellnessScore 
+                            onViewDashboard={() => {
+                              setShowPastAssessments(false);
+                              // Already on dashboard, just close modal
+                            }}
+                            onTakeSurveyAgain={() => {
+                              setShowPastAssessments(false);
+                              navigate('/survey');
+                            }}
+                            className="min-h-0 bg-transparent shadow-none"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      // No Assessment Data Available
+                      <div className="text-center py-20">
+                        <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                          <Calendar className="w-10 h-10 text-gray-400" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-black mb-4">No Assessment Data Available</h3>
+                        <p className="text-[#777] text-lg mb-8 max-w-md mx-auto">
+                          {assessmentData === null ? (
+                            'No check-in data found. Take your first wellness assessment to see your comprehensive report.'
+                          ) : (
+                            'This check-in doesn\'t contain detailed wellness assessment data. Take a new assessment to see your comprehensive wellness report.'
+                          )}
+                        </p>
+                        <motion.button
+                          onClick={() => {
+                            setShowPastAssessments(false);
+                            navigate('/survey');
+                          }}
+                          className="px-8 py-4 bg-[#007CFF] hover:bg-[#0066CC] text-white rounded-2xl transition-all duration-300 text-lg font-semibold shadow-lg hover:shadow-xl"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
+                          Take Assessment
+                        </motion.button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
               </div>
 
-              {/* Right Column - 25% width (3 columns) */}
-              <div className="col-span-12 xl:col-span-3 space-y-6">
-                
-                {/* Daily Goals */}
+          {/* Right Column - Sidebar */}
+          <div className="xl:col-span-2 space-y-6">
+            
+            {/* Top Row - Daily Goals and Crisis Support */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Daily Goals */}
                 <motion.div 
-                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
+                className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
                 >
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Daily Goals</h3>
+              <h3 className="text-lg font-bold text-black mb-4">Daily Goals</h3>
                   <div className="space-y-3">
                     {dailyGoals.map(goal => (
-                      <div 
+                  <div 
                         key={goal.id}
-                        className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors hover:scale-105"
-                      >
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm">
-                          <goal.icon className="w-4 h-4 text-white" />
+                    className={`flex items-center space-x-3 p-3 rounded-2xl transition-colors hover:scale-105 ${
+                      goal.completed ? 'bg-green-50 border border-green-100' : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-sm ${
+                      goal.completed ? 'bg-green-500' : 'bg-[#007CFF]'
+                    }`}>
+                      <goal.icon className="w-4 h-4 text-white" />
                         </div>
-                        <span className="flex-1 text-sm font-medium text-gray-800">
+                        <span className={`flex-1 text-sm font-medium ${
+                      goal.completed ? 'text-green-800' : 'text-black'
+                        }`}>
                           {goal.text}
                         </span>
+                    {goal.completed && (
+                      <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
                       </div>
+                    )}
+                  </div>
                     ))}
                   </div>
                 </motion.div>
 
-                {/* Crisis Support */}
+            {/* Crisis Support */}
                 <motion.div 
-                  className="rounded-xl shadow-lg bg-gradient-to-br from-red-50/80 to-pink-50/80 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl"
+              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
                 >
-                  <h3 className="text-lg font-bold text-red-900 mb-3">Crisis Support</h3>
-                  <p className="text-sm text-gray-700 mb-4">24/7 help available</p>
-                  <motion.button 
-                    onClick={() => window.open('tel:988', '_self')}
-                    className="w-full bg-gradient-to-r from-red-400 to-red-600 text-white py-3 rounded-xl font-semibold hover:from-red-500 hover:to-red-700 transition-all duration-300 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-105"
+              <h3 className="text-lg font-bold text-black mb-3">Crisis Support</h3>
+              <p className="text-sm text-[#777] mb-4">24/7 help available</p>
+                      <motion.button
+                onClick={() => window.open('tel:1800-599-0019', '_self')}
+                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-105"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call KIRAN 1800-599-0019</span>
+                      </motion.button>
+              <p className="text-xs text-[#777] mt-2 text-center">
+                Free, confidential support
+              </p>
+                </motion.div>
+            </div>
+
+            {/* Quick Actions */}
+                <motion.div 
+              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              <h3 className="text-lg font-bold text-black mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                {/* Therapist CTA for low wellness scores */}
+                {currentWellness.score < 6 && (
+                  <motion.button
+                    onClick={() => navigate('/therapist-booking')}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.99 }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4 }}
                   >
-                    <Phone className="w-4 h-4" />
-                    <span>Call 988</span>
+                    <Users className="w-4 h-4" />
+                    <span>Consult a Therapist</span>
                   </motion.button>
-                  <p className="text-xs text-gray-600 mt-2 text-center">
-                    Free, confidential support
-                  </p>
-                </motion.div>
-
-                {/* Quick Actions */}
-                <motion.div 
-                  className="rounded-xl shadow-lg bg-white/70 backdrop-blur-xl p-6 border border-white/30 transition-all hover:shadow-2xl hover:bg-white/80"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.3 }}
+                )}
+                <motion.button
+                  onClick={() => navigate('/survey')}
+                  className="w-full bg-[#007CFF] hover:bg-[#0066CC] text-white py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.99 }}
                 >
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
-                  <div className="space-y-3">
-                    <motion.button
-                      onClick={() => navigate('/survey')}
-                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white py-3 px-4 rounded-xl hover:from-teal-600 hover:to-cyan-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-teal-500/25 hover:shadow-xl hover:ring-2 hover:ring-teal-300 flex items-center justify-center space-x-2 hover:scale-105"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.99 }}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Take Survey</span>
-                    </motion.button>
-                    <motion.button
-                      onClick={() => setShowChatbot(true)}
-                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-4 rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-purple-500/25 hover:shadow-2xl hover:ring-2 hover:ring-purple-300 flex items-center justify-center space-x-2 hover:scale-105"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Heart className="w-4 h-4" />
-                      <span>Chat with Sarthi</span>
-                    </motion.button>
-                    <motion.button
-                      onClick={loadAllCheckins}
-                      className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold flex items-center justify-center space-x-2 hover:scale-105"
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      <span>Refresh</span>
-                    </motion.button>
-                  </div>
-                </motion.div>
-
-                {/* Therapist Landing Section */}
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.4 }}
+                  <Sparkles className="w-4 h-4" />
+                  <span>Take Survey</span>
+                </motion.button>
+                <motion.button
+                  onClick={() => setShowChatbot(true)}
+                  className="w-full bg-[#007CFF] hover:bg-[#0066CC] text-white py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <TherapistLandingSection />
-                </motion.div>
-
-                {/* Chat History Widget */}
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.5 }}
+                  <Heart className="w-4 h-4" />
+                  <span>Chat with Sarthi</span>
+                </motion.button>
+                <motion.button
+                  onClick={() => loadAllCheckins(true)}
+                  className="w-full bg-white text-[#777] py-3 px-4 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-colors text-sm font-semibold flex items-center justify-center space-x-2 hover:scale-105"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                 >
-                  <ChatHistoryWidget 
-                    userId={currentUser?.uid} 
-                    onResumeChat={handleResumeChat}
-                  />
-                </motion.div>
-              </div>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Refresh</span>
+                </motion.button>
             </div>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+
+            {/* Therapist Landing Section */}
+          <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
+            >
+              <TherapistLandingSection />
+          </motion.div>
+
+            {/* Chat History Widget */}
+          <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+            >
+              <ChatHistoryWidget 
+                userId={currentUser?.uid} 
+                onResumeChat={handleResumeChat}
+              />
+            </motion.div>
+                          </div>
+                </div>
+              </div>
 
       {/* Manova Chatbot Modal */}
       {showChatbot && (
-        <motion.div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setShowChatbot(false)}
-        >
           <motion.div
-            className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col mx-4 md:mx-0"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            onClick={(e) => e.stopPropagation()}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          onClick={() => setShowChatbot(false)}
           >
-            <div className="flex items-center justify-between px-4 py-3 md:px-6 border-b border-gray-200 bg-white shadow-sm rounded-t-lg z-10">
+            <motion.div
+            className="bg-white rounded-3xl shadow-xl w-full max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col mx-4 md:mx-0"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D8D8D8] bg-white shadow-sm rounded-t-3xl z-10">
               <div className="flex items-center space-x-3 min-w-0">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden bg-gradient-to-br from-amber-100 to-orange-100">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden bg-[#007CFF]">
                   <img 
                     src="/images/mascot.svg" 
                     alt="Sarthi Avatar"
                     className="w-10 h-10 object-cover"
                   />
-                </div>
+                  </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg md:text-xl font-semibold text-gray-800 truncate">
+                  <h2 className="text-lg md:text-xl font-semibold text-black truncate">
                     Sarthi – Your Emotional Wellness Companion
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-[#777] mt-1">
                     Here to listen, understand, and support.
-                  </p>
-                </div>
+                      </p>
+                    </div>
               </div>
               
               <div className="flex items-center space-x-2 flex-shrink-0">
@@ -1012,7 +1328,7 @@ const DashboardPage = () => {
                       console.log('New chat function not available yet');
                     }
                   }}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all shadow-sm"
+                  className="flex items-center space-x-2 px-3 py-2 rounded-2xl text-sm font-medium bg-blue-50 text-[#007CFF] hover:bg-blue-100 transition-all shadow-sm border border-blue-100"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -1022,7 +1338,7 @@ const DashboardPage = () => {
                 
                 <button
                   onClick={() => setShowChatbot(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50"
+                  className="text-[#777] hover:text-black transition-colors p-2 rounded-2xl hover:bg-gray-50"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1040,11 +1356,11 @@ const DashboardPage = () => {
                   }}
                 />
               </ChatSessionProvider>
-            </div>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </div>
+        )}
+      </div>
   );
 };
 

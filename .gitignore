@@ -25,3 +25,5 @@ dist-ssr
 .vercel
 
 .config/
+node_modules/
+.env

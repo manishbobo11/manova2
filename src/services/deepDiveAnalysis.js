@@ -295,53 +295,162 @@ export const formatDeepDiveForUI = (analysis, responseData) => {
 };
 
 /**
- * Generate therapeutic support response based on user's input
- * @param {Object} supportData - The therapeutic support data
- * @param {string} supportData.questionText - The original survey question
- * @param {string} supportData.userAnswer - User's selected response
- * @param {Array} supportData.contributors - Array of stress contributors selected
- * @param {string} supportData.userNote - User's additional text input
- * @returns {Promise<Object>} Therapeutic support response with 5 fields
+ * Generate enhanced therapeutic support response with contextual empathy
+ * @param {string} userMessage - The user's written text describing their feelings
+ * @param {Array} selectedContributors - Dropdown selections (e.g., ["boss", "self-doubt", "relationship"])  
+ * @param {Array} emotionHistory - Last 3 vector entries from Pinecone emotional history
+ * @returns {Promise<string>} Wise mentor-style therapeutic response in user's language
  */
-export const generateTherapistSupport = async (supportData) => {
+export const generateTherapistSupport = async (userMessage, selectedContributors = [], emotionHistory = []) => {
   try {
-    const { questionText, userAnswer, contributors, userNote } = supportData;
-
-    console.log('🧠 Generating therapist support for:', {
-      hasContributors: contributors && contributors.length > 0,
-      hasUserNote: !!userNote,
-      contributorsCount: contributors?.length || 0
+    console.log('🧠 Generating enhanced therapist support:', {
+      hasUserMessage: !!userMessage,
+      contributorsCount: selectedContributors.length,
+      historyCount: emotionHistory.length
     });
 
-    // Create the therapist support prompt
-    const therapistPrompt = `
-You are a licensed therapist providing compassionate support to a client. Based on their wellness survey response, provide therapeutic guidance.
+    // Import language detection from manovaAgent
+    const { detectLanguagePreference } = await import('./ai/manovaAgent.js');
+    
+    // Detect user's language preference from their message
+    const userLanguage = detectLanguagePreference(userMessage);
+    const isHinglish = userLanguage === 'Hinglish';
+    const isHindi = userLanguage === 'Hindi';
+    
+    console.log(`🗣️ Detected language: ${userLanguage}`);
 
-Context:
-Question: "${questionText}"
-User's Answer: "${userAnswer}"
-${contributors && contributors.length > 0 ? `Stress Contributors: ${contributors.join(', ')}` : ''}
-${userNote ? `Additional Note: "${userNote}"` : ''}
+    // Check if we have enough context or should use fallback
+    if (!userMessage || userMessage.trim().length === 0) {
+      return generateTherapistFallback(userLanguage);
+    }
 
-Provide a therapeutic response with exactly these 5 components:
+    if (emotionHistory.length === 0) {
+      return generateTherapistFallback(userLanguage);
+    }
 
-1. A warm, empathetic opening that acknowledges their experience
-2. Validation that normalizes their feelings in this situation
-3. Two simple, personalized action steps they can take
-4. A gentle self-care reminder
-5. Professional insight on how this approach can reduce their stress
+    // Analyze emotional patterns from history
+    const emotionalContext = analyzeEmotionalPatterns(emotionHistory);
+    
+    // Create context-aware therapeutic prompt
+    const therapeuticPrompt = createTherapeuticPrompt(
+      userMessage, 
+      selectedContributors, 
+      emotionalContext,
+      userLanguage
+    );
 
-✅ Output only valid JSON in this format:
-{
-  "supportMessage": "Warm, therapist-like empathetic message here",
-  "validation": "Normalize their feelings based on the situation",
-  "actionSteps": ["Action 1", "Action 2"],
-  "compassionReminder": "Gentle self-care message",
-  "therapistInsight": "Professional insight on stress reduction"
-}
-Do not include anything else.
-`;
+    // Call Azure OpenAI for therapeutic response
+    const therapeuticResponse = await callAzureForTherapy(therapeuticPrompt);
+    
+    if (!therapeuticResponse) {
+      return generateTherapistFallback(userLanguage);
+    }
 
+    console.log('✅ Enhanced therapist support generated successfully');
+    return therapeuticResponse;
+
+  } catch (error) {
+    console.error('❌ Enhanced therapist support generation failed:', error.message);
+    const { detectLanguagePreference } = await import('./ai/manovaAgent.js');
+    const userLanguage = detectLanguagePreference(userMessage || '');
+    return generateTherapistFallback(userLanguage);
+  }
+};
+
+/**
+ * Analyze emotional patterns from user's vector history
+ * @param {Array} emotionHistory - Last 3 vector entries from Pinecone
+ * @returns {Object} Analyzed emotional context
+ */
+const analyzeEmotionalPatterns = (emotionHistory) => {
+  if (!emotionHistory || emotionHistory.length === 0) {
+    return {
+      recentPatterns: 'This is our first conversation',
+      dominantStressors: [],
+      emotionalIntensity: 'moderate',
+      recurringThemes: []
+    };
+  }
+
+  // Extract stress domains and scores
+  const stressDomains = emotionHistory.map(entry => entry.metadata?.domain || 'general');
+  const stressScores = emotionHistory.map(entry => entry.metadata?.stressScore || 0);
+  const emotions = emotionHistory.map(entry => entry.metadata?.emotion || 'neutral');
+  
+  // Calculate dominant patterns
+  const domainCounts = {};
+  stressDomains.forEach(domain => {
+    domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+  });
+  
+  const dominantStressors = Object.entries(domainCounts)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 2)
+    .map(([domain]) => domain);
+  
+  const avgStressScore = stressScores.reduce((sum, score) => sum + score, 0) / stressScores.length;
+  const emotionalIntensity = avgStressScore >= 7 ? 'high' : avgStressScore >= 4 ? 'moderate' : 'low';
+  
+  const recentConcerns = emotionHistory
+    .filter(entry => entry.metadata?.stressScore >= 5)
+    .map(entry => `${entry.metadata?.domain}: ${entry.metadata?.emotion}`)
+    .slice(0, 2);
+
+  return {
+    recentPatterns: recentConcerns.length > 0 ? 
+      `Recent stress in: ${recentConcerns.join(', ')}` : 
+      'Generally managing stress well',
+    dominantStressors,
+    emotionalIntensity,
+    recurringThemes: stressDomains,
+    avgStressLevel: avgStressScore
+  };
+};
+
+/**
+ * Create therapeutic prompt with emotional context and language awareness
+ */
+const createTherapeuticPrompt = (userMessage, selectedContributors, emotionalContext, userLanguage) => {
+  const contributorsText = selectedContributors.length > 0 ? 
+    `\nCurrent stress contributors: ${selectedContributors.join(', ')}` : '';
+  
+  const emotionalHistoryText = emotionalContext.recentPatterns !== 'This is our first conversation' ?
+    `\nEmotional history context: ${emotionalContext.recentPatterns}
+Recent stress patterns: ${emotionalContext.dominantStressors.join(', ')}
+Emotional intensity level: ${emotionalContext.emotionalIntensity}` : '';
+
+  const languageInstructions = userLanguage === 'Hinglish' ? 
+    'Respond in natural Hinglish (Hindi-English mix) like "Main samajh raha hoon", "Tu strong hai", etc.' :
+    userLanguage === 'Hindi' ? 
+    'Respond in natural Hindi like a caring friend would speak.' :
+    'Respond in warm, natural English.';
+
+  return `You are a wise mentor and therapist who deeply understands human emotions. You combine professional insight with the warmth of someone who truly believes in the user.
+
+User's current message: "${userMessage}"${contributorsText}${emotionalHistoryText}
+
+Your task is to provide therapeutic support in exactly 2 parts:
+
+PART 1 - EMPATHIZE: Start with deep emotional validation that shows you understand what they're going through. Use emotional cues from their message and acknowledge their specific situation with genuine care.
+
+PART 2 - GUIDE: Suggest ONE small, realistic coping idea that's specific to their situation. Make it actionable and domain-specific (e.g., "write a boundary message to your boss", "journal what you felt today", "can you take one step toward what feels right?").
+
+IMPORTANT RULES:
+- ${languageInstructions}
+- Be a wise mentor who believes in them, not a generic counselor
+- Never give "you'll be fine" responses - instead validate emotions and guide clearly
+- Your response should feel like someone who truly understands and has wisdom to share
+- Keep total response to 3-4 sentences maximum
+- Make the coping suggestion very specific and immediately actionable
+
+Response format: Just provide the therapeutic response directly, no JSON or formatting.`;
+};
+
+/**
+ * Call Azure OpenAI for therapeutic response generation
+ */
+const callAzureForTherapy = async (therapeuticPrompt) => {
+  try {
     // Azure OpenAI configuration
     const azureKey = process.env.AZURE_OPENAI_API_KEY || process.env.VITE_AZURE_OPENAI_KEY;
     const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT || process.env.VITE_AZURE_OPENAI_ENDPOINT;
@@ -349,13 +458,12 @@ Do not include anything else.
     const azureVersion = process.env.AZURE_OPENAI_API_VERSION || process.env.VITE_AZURE_OPENAI_API_VERSION;
 
     if (!azureKey || !azureEndpoint || !azureDeployment) {
-      console.warn('⚠️ Missing Azure OpenAI configuration, using fallback support');
-      return generateFallbackTherapistSupport(supportData);
+      console.warn('⚠️ Missing Azure OpenAI configuration');
+      return null;
     }
 
-    console.log('📡 Calling Azure OpenAI for therapist support...');
+    console.log('📡 Calling Azure OpenAI for enhanced therapeutic response...');
 
-    // Call Azure OpenAI GPT-4o
     const endpoint = `${azureEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=${azureVersion}`;
     
     const response = await fetch(endpoint, {
@@ -368,160 +476,59 @@ Do not include anything else.
         messages: [
           { 
             role: "system", 
-            content: "You are a licensed therapist providing compassionate, professional mental health support. Your responses should be warm, validating, and therapeutically sound." 
+            content: "You are a wise mentor and therapist who combines deep emotional understanding with practical guidance. Your responses should be warm, validating, and provide clear direction." 
           },
           { 
             role: "user", 
-            content: therapistPrompt 
+            content: therapeuticPrompt 
           }
         ],
-        temperature: 0.7,
-        max_tokens: 500,
+        temperature: 0.8,
+        max_tokens: 300,
         stream: false
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ Azure OpenAI error:', errorData);
-      throw new Error(`Azure OpenAI API failed: ${response.status}`);
+      console.error('❌ Azure OpenAI error:', response.status);
+      return null;
     }
 
     const data = await response.json();
     
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Invalid response structure from Azure OpenAI');
+      console.error('❌ Invalid response structure from Azure OpenAI');
+      return null;
     }
 
-    const rawResponse = data.choices[0].message.content.trim();
-    console.log('🤖 Raw therapist support response:', rawResponse);
-
-    // Parse and clean JSON response
-    let cleanedResponse = rawResponse;
-    if (cleanedResponse.startsWith('```json')) {
-      cleanedResponse = cleanedResponse.replace(/```json\n?/, '').replace(/\n?```$/, '');
-    }
-    if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse.replace(/```\n?/, '').replace(/\n?```$/, '');
-    }
+    const therapeuticResponse = data.choices[0].message.content.trim();
+    console.log('🤖 Enhanced therapeutic response generated');
     
-    const parsedSupport = JSON.parse(cleanedResponse);
-    
-    // Validate the response structure
-    const requiredFields = ['supportMessage', 'validation', 'actionSteps', 'compassionReminder', 'therapistInsight'];
-    const missingFields = requiredFields.filter(field => !parsedSupport[field]);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Invalid support structure - missing fields: ${missingFields.join(', ')}`);
-    }
-
-    if (!Array.isArray(parsedSupport.actionSteps)) {
-      throw new Error('Invalid support structure - actionSteps must be an array');
-    }
-
-    console.log('✅ Therapist support generated successfully');
-
-    return {
-      success: true,
-      ...parsedSupport,
-      generated: 'ai',
-      timestamp: new Date().toISOString()
-    };
+    return therapeuticResponse;
 
   } catch (error) {
-    console.error('❌ Therapist support generation failed:', error.message);
-    console.log('🔄 Using fallback therapist support');
-    
-    return generateFallbackTherapistSupport(supportData);
+    console.error('❌ Azure OpenAI call failed:', error.message);
+    return null;
   }
 };
 
 /**
- * Generate fallback therapist support when AI fails
- * @param {Object} supportData - The therapeutic support data
- * @returns {Object} Fallback therapeutic support response
+ * Generate fallback therapeutic response when AI fails or no context available
+ * @param {string} userLanguage - Detected user language (English, Hindi, Hinglish)
+ * @returns {string} Fallback therapeutic response
  */
-const generateFallbackTherapistSupport = (supportData) => {
-  const { questionText, userAnswer, contributors, userNote } = supportData;
-
-  console.log('🔄 Generating fallback therapist support');
-
-  // Determine stress level based on answer
-  const isHighStress = userAnswer && (
-    userAnswer.toLowerCase().includes('very often') ||
-    userAnswer.toLowerCase().includes('always') ||
-    userAnswer.toLowerCase().includes('extremely') ||
-    userAnswer.toLowerCase().includes('completely')
-  );
-
-  const isLowStress = userAnswer && (
-    userAnswer.toLowerCase().includes('never') ||
-    userAnswer.toLowerCase().includes('rarely') ||
-    userAnswer.toLowerCase().includes('not at all')
-  );
-
-  // Generate contextual support based on stress level and contributors
-  let supportMessage, validation, actionSteps, compassionReminder, therapistInsight;
-
-  if (isHighStress) {
-    supportMessage = "I can hear that you're experiencing significant stress right now, and I want you to know that reaching out and reflecting on these feelings takes courage.";
-    validation = "What you're feeling is completely understandable given the challenges you're facing. Many people experience similar struggles, and your emotional response is a normal reaction to difficult circumstances.";
-    actionSteps = [
-      "Take three deep breaths right now, focusing on slowing down your exhale",
-      "Identify one small thing you can do today to reduce pressure on yourself"
-    ];
-    compassionReminder = "Remember that you're doing the best you can with the resources you have right now. Be gentle with yourself as you navigate this challenging time.";
-    therapistInsight = "By acknowledging your stress and taking small, manageable steps, you're building emotional resilience and breaking the cycle of overwhelm that often intensifies our stress response.";
-  } else if (isLowStress) {
-    supportMessage = "It's wonderful that you're feeling relatively stable in this area. Recognizing and maintaining your well-being is just as important as addressing challenges.";
-    validation = "Your sense of balance and control in this situation is a strength worth acknowledging. It's normal to have areas of life that feel more manageable than others.";
-    actionSteps = [
-      "Take a moment to appreciate what's working well for you in this area",
-      "Consider how you might apply these successful strategies to other challenging areas of your life"
-    ];
-    compassionReminder = "Continue to nurture the positive patterns that are serving you well. Your emotional stability is a valuable resource.";
-    therapistInsight = "Recognizing your areas of strength helps build confidence and provides a foundation for addressing other challenges with greater resilience and self-assurance.";
+const generateTherapistFallback = (userLanguage) => {
+  console.log('🔄 Generating fallback therapeutic response');
+  
+  if (userLanguage === 'Hinglish') {
+    return "Main samajh raha hoon, yeh thoda heavy lag raha hoga. Tera saath hoon — ab bol, ek choti si shuruaat kya ho sakti hai?";
+  } else if (userLanguage === 'Hindi') {
+    return "मैं समझ रहा हूं, यह थोड़ा भारी लग रहा होगा। तुम्हारे साथ हूं — अब बताओ, एक छोटी सी शुरुआत क्या हो सकती है?";
   } else {
-    supportMessage = "Thank you for sharing your experience with me. It takes self-awareness to recognize and reflect on how different situations affect your well-being.";
-    validation = "Your feelings about this situation are valid and important. It's completely normal to have mixed or moderate responses to life's challenges.";
-    actionSteps = [
-      "Spend a few minutes journaling about what specifically feels challenging in this area",
-      "Reach out to someone you trust to share your thoughts and feelings"
-    ];
-    compassionReminder = "Give yourself permission to feel whatever comes up without judgment. Your emotional experience deserves attention and care.";
-    therapistInsight = "By exploring your emotions with curiosity rather than judgment, you're developing emotional intelligence that will serve you well in managing future challenges.";
+    return "I can sense this feels heavy right now. I'm here with you — tell me, what could be one small step to start with?";
   }
-
-  // Incorporate contributors if available
-  if (contributors && contributors.length > 0) {
-    const contributorContext = contributors.join(', ').toLowerCase();
-    if (contributorContext.includes('work') || contributorContext.includes('career')) {
-      actionSteps[1] = "Set one clear boundary between your work and personal time today";
-    } else if (contributorContext.includes('financial') || contributorContext.includes('money')) {
-      actionSteps[1] = "Write down three small expenses you could reduce this week";
-    } else if (contributorContext.includes('relationship') || contributorContext.includes('social')) {
-      actionSteps[1] = "Send a kind message to someone who makes you feel supported";
-    }
-  }
-
-  // Incorporate user note if available
-  if (userNote && userNote.trim().length > 0) {
-    supportMessage += ` Your additional thoughts show great self-reflection and awareness.`;
-  }
-
-  console.log('✅ Fallback therapist support generated');
-
-  return {
-    success: true,
-    supportMessage,
-    validation,
-    actionSteps,
-    compassionReminder,
-    therapistInsight,
-    generated: 'fallback',
-    timestamp: new Date().toISOString()
-  };
 };
+
 
 export default {
   generateDeepDiveAnalysis,

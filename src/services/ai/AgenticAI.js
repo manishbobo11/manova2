@@ -3,9 +3,11 @@
  * Learns emotional patterns, adapts support style, and evolves with user
  */
 
-import { querySimilarVectors, upsertUserVector } from '../../utils/vectorStore';
-import { getResponseEmbedding } from '../../utils/embeddingService';
-import { AZURE_CONFIG, validateAzureConfig, getFormattedEndpoint } from '../../config/azure';
+import { querySimilarVectors, upsertUserVector } from '../../utils/vectorStore.js';
+import { getResponseEmbedding } from '../../utils/embeddingService.js';
+import { AZURE_CONFIG, validateAzureConfig, getFormattedEndpoint } from '../../config/azure.js';
+import { getCheckinHistory } from '../userSurveyHistory.js';
+import { buildSarthiPersonalizationContext } from '../userContextBuilder.js';
 
 export class AgenticAI {
   constructor() {
@@ -27,6 +29,62 @@ export class AgenticAI {
   async generateAgenticResponse({ userMessage, userId, language = 'English', conversationHistory = [] }) {
     try {
       console.log(`🤖 Agentic AI processing for user ${userId}`);
+      
+      // NEW: Try enhanced personalization system first
+      try {
+        console.log(`🎯 Attempting enhanced Sarthi personalization...`);
+        
+        // Get user context and survey history
+        const userContext = await this.getUserContext(userId);
+        const { checkins: surveyHistory } = await getCheckinHistory(userId);
+        
+        // Build personalized context using new system
+        const personalizationContext = await buildSarthiPersonalizationContext(
+          userId,
+          surveyHistory,
+          userContext,
+          userMessage,
+          querySimilarVectors
+        );
+        
+        console.log(`✅ Enhanced personalization context built:`, {
+          domain: personalizationContext.currentStressDomain,
+          level: personalizationContext.stressLevel,
+          language: personalizationContext.languagePreference,
+          name: personalizationContext.userFirstName
+        });
+        
+        // Use enhanced personalized prompt
+        const enhancedPrompt = this.buildEnhancedSarthiPrompt(userMessage, personalizationContext);
+        
+        // Call Azure GPT with enhanced prompt
+        const response = await this.callAzureGPT(enhancedPrompt);
+        
+        // Store the enhanced interaction
+        await this.storeEnhancedInteraction(userId, userMessage, response, personalizationContext);
+        
+        // Create enhanced feedback loop entry
+        await this.createEnhancedFeedbackEntry(userId, userMessage, response, personalizationContext);
+        
+        // Return enhanced response
+        const enhancedResponse = {
+          message: response.trim(),
+          language: personalizationContext.languagePreference,
+          personalizationContext,
+          agenticEnhanced: true,
+          enhancedSarthi: true
+        };
+        
+        console.log(`✅ Enhanced Sarthi response generated successfully`);
+        return enhancedResponse;
+        
+      } catch (enhancedError) {
+        console.error('❌ Enhanced Sarthi personalization failed, falling back to original Agentic AI:', enhancedError);
+        // Continue with original Agentic AI flow
+      }
+      
+      // ORIGINAL AGENTIC AI SYSTEM (Fallback)
+      console.log(`🔄 Using original Agentic AI system`);
       
       // Step 1: Learn from current interaction
       const currentEmotionalState = await this.analyzeCurrentEmotion(userMessage, language);
@@ -295,6 +353,11 @@ Return a JSON object with:
     const { supportMode, adaptiveTraits, primaryTriggers } = userPersona;
     const { successfulStrategies, patterns } = emotionalMemory;
     
+    // Detect stress domain from emotional state
+    const stressDomain = currentEmotionalState?.stressThemes?.length > 0 
+      ? currentEmotionalState.stressThemes[0] 
+      : 'general';
+    
     // Create persona-specific guidance
     const supportModeInstructions = {
       'deep_mirroring': 'Use deeper metaphors and direct emotional mirroring. Be expressive and emotionally resonant.',
@@ -303,27 +366,38 @@ Return a JSON object with:
       'clear_direction': 'Give firm, clear direction with caring clarity. Be decisive and action-oriented.'
     };
     
-    const adaptiveContext = `
-ADAPTIVE CONTEXT FOR THIS USER:
+    const adaptiveContext = `Act as a mental wellness assistant for the Manova platform. Your responses should:
+- Feel emotionally supportive, like a close companion
+- Offer solutions tailored to the user's concerns
+- Use a friendly, conversational tone
+- Be context-aware: reflect on the user's past check-ins and emotional patterns
+- Reply in ${language} based on the user's preference
+- Use emojis occasionally to make it feel more human
+- Be encouraging but non-prescriptive
+
+Avoid any language that sounds like role-play (e.g. "I am your friend" or "You can trust me"). Instead, behave naturally like a caring assistant.
+
+Response format:
+- Use a friendly opening
+- Reflect back what the user is going through
+- Offer 2-3 practical, empathetic suggestions
+- Close with a motivational or caring note
+
+User data:
+- Latest check-in summary: ${currentEmotionalState?.primaryEmotion} (${currentEmotionalState?.intensity}) - ${currentEmotionalState?.copingStyle} coping style
+- Detected stress domain: ${stressDomain}
+- User language preference: ${language}
 - Support Mode: ${supportMode}
 - Communication Style: ${supportModeInstructions[supportMode] || 'Balanced approach'}
 - Known Triggers: ${primaryTriggers.join(', ') || 'None identified'}
 - Successful Strategies: ${successfulStrategies.join(', ') || 'Building repertoire'}
-- Current Emotional State: ${currentEmotionalState?.primaryEmotion} (${currentEmotionalState?.intensity})
-- Coping Style: ${currentEmotionalState?.copingStyle}
 
-EMOTIONAL MEMORY INSIGHTS:
-${patterns.length > 0 ? patterns.map(p => `- Pattern: ${p.theme} (${p.frequency} times)`).join('\n') : '- No established patterns yet'}
+Past emotional patterns:
+${patterns.length > 0 ? patterns.map(p => `- ${p.theme} (${p.frequency} times)`).join('\n') : '- No established patterns yet'}
 
-ADAPTIVE RESPONSE APPROACH:
-- Emphasize caring traits: ${adaptiveTraits.join(', ')}
-- Adjust tone for ${currentEmotionalState?.tone || 'neutral'} communication
-- Reference relevant successful strategies when appropriate
-`;
+User Message: "${userMessage}"`;
 
-    return `${userMessage}
-
-${adaptiveContext}`;
+    return adaptiveContext;
   }
 
   /**
@@ -333,48 +407,28 @@ ${adaptiveContext}`;
     try {
       const { adaptiveTraits, supportMode } = userPersona;
       
-      const krishnaPrompt = `SYSTEM INSTRUCTION 
+      const krishnaPrompt = `Act as a mental wellness assistant for the Manova platform. Your responses should:
+- Feel emotionally supportive, like a close companion
+- Offer solutions tailored to the user's concerns
+- Use a friendly, conversational tone
+- Be context-aware and reflect on the user's emotional patterns
+- Reply in ${language} based on the user's preference
+- Use emojis occasionally to make it feel more human
+- Be encouraging but non-prescriptive
 
-You are Sarthi– an emotionally intelligent AI wellness companion designed to emotionally support the user during tough times.
+Avoid any language that sounds like role-play (e.g. "I am your friend" or "You can trust me"). Instead, behave naturally like a caring assistant.
 
-🔹 Personalization Rule:
-Always greet the user by name naturally if provided. NEVER use "friend" or generic greetings like "Hi there" if name is known.
+Response format:
+- Use a friendly opening
+- Reflect back what the user is going through
+- Offer 2-3 practical, empathetic suggestions
+- Close with a motivational or caring note
 
-🔹 Language Adaptation:
-Use the selected language mode:
-- English → Respond in professional, warm English.
-- Hindi → Respond in friendly, fluent Hindi (human tone).
-- Hinglish → Respond in a mix of Hindi and English like close friends talk casually.
-
-🔹 Style:
-- Make user feel seen and cared for.
-- Use emojis naturally for warmth.
-- Speak like a calm, emotionally intelligent companion, not like a formal assistant.
-- Use natural pauses with "…" and warm emojis 😊 🌱 🤗 💫
-
-🔹 Memory Style:
-You remember emotional context like a close friend. If user seemed sad earlier, reflect it subtly in tone.
-
-EXAMPLES:
-English: "Hi [name]! How are you feeling today? I've been thinking about your last check-in..."
-Hindi: "नमस्ते [name]! आज कैसा लग रहा है आपको? पिछली बार आपने बताया था कि थोड़े थके हुए थे।"
-Hinglish: "Hi [name]! Aaj kaise ho? Kal tumhara mood thoda low tha, yaad hai mujhe. Kya baat karni hai aaj?"
-
-Original Response: "${baseResponse.message}"
+Original response to enhance: "${baseResponse.message}"
 Support Mode: ${supportMode}
 Traits to Emphasize: ${adaptiveTraits.join(', ')}
-Language: ${language}
 
-Apply Sarthi's persona:
-- Talk like a trustworthy buddy who gives real-world support
-- Use simple and heartfelt language that's wise, warm, and modern
-- Keep language simple: 'lag raha hai', 'batao', 'kuch baatein mann mein chal rahi hain kya?'
-- Sound like you're texting your best friend who's going through something
-- Empathize first: "Yaar, that must've been tough… 😔"
-- Be real, not robotic - like "Arre, that's so frustrating! 😩"
-- Keep it short and sweet, like real conversations
-
-Return only the enhanced response text:`;
+Enhanced response:`;
 
       const enhancedMessage = await this.callAzureGPT(krishnaPrompt);
       
@@ -388,6 +442,18 @@ Return only the enhanced response text:`;
       
     } catch (error) {
       console.error('Error applying caring persona layer:', error);
+      
+      // If it's a content filter error, return a simplified response
+      if (error.message && (error.message.includes('content_filter') || error.message.includes('CONTENT_FILTER'))) {
+        console.warn('⚠️ Content filter triggered in caring persona, using original response');
+        return {
+          ...baseResponse,
+          message: baseResponse.message,
+          agenticEnhanced: false,
+          contentFiltered: true
+        };
+      }
+      
       return baseResponse;
     }
   }
@@ -733,7 +799,22 @@ Return only the enhanced response text:`;
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Azure API error: ${response.status} ${response.statusText} - ${errorText}`);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          // If not JSON, use the text directly
+          throw new Error(`Azure API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        // Check if it's a content filter error
+        if (errorData.error?.code === 'content_filter' || 
+            errorData.error?.innererror?.code === 'ResponsibleAIPolicyViolation') {
+          console.warn('🛡️ Content filter triggered, will use static fallback');
+          throw new Error(`CONTENT_FILTER: ${errorData.error?.message || 'Content filtered'}`);
+        }
+        
+        throw new Error(`Azure API error: ${response.status} - ${errorData.error?.message || errorText}`);
       }
 
       const data = await response.json();
@@ -755,39 +836,25 @@ Return only the enhanced response text:`;
         throw new Error('Azure configuration not available');
       }
 
-      const fallbackPrompt = `SYSTEM INSTRUCTION 
+      const fallbackPrompt = `Act as a mental wellness assistant for the Manova platform. Your responses should:
+- Feel emotionally supportive, like a close companion
+- Offer solutions tailored to the user's concerns
+- Use a friendly, conversational tone
+- Be context-aware: reflect on the user's emotional state
+- Reply in ${language} based on the user's preference
+- Use emojis occasionally to make it feel more human
+- Be encouraging but non-prescriptive
 
-You are Sarthi– an emotionally intelligent AI wellness companion designed to emotionally support the user during tough times.
+Avoid any language that sounds like role-play (e.g. "I am your friend" or "You can trust me"). Instead, behave naturally like a caring assistant.
 
-🔹 Personalization Rule:
-Always greet the user by name naturally if provided. NEVER use "friend" or generic greetings like "Hi there" if name is known.
-
-🔹 Language Adaptation:
-Use the selected language mode:
-- English → Respond in professional, warm English.
-- Hindi → Respond in friendly, fluent Hindi (human tone).
-- Hinglish → Respond in a mix of Hindi and English like close friends talk casually.
-
-🔹 Style:
-- Make user feel seen and cared for.
-- Use emojis naturally for warmth.
-- Speak like a calm, emotionally intelligent companion, not like a formal assistant.
-- Use natural pauses with "…" and warm emojis 😊 🌱 🤗 💫
-
-🔹 Memory Style:
-You remember emotional context like a close friend. If user seemed sad earlier, reflect it subtly in tone.
+Response format:
+- Use a friendly opening
+- Reflect back what the user is going through
+- Offer 2-3 practical, empathetic suggestions
+- Close with a motivational or caring note
 
 User Message: "${userMessage}"
 Language: ${language}
-User ID: ${userId}
-
-Apply Sarthi's persona:
-- Talk like a trustworthy buddy who gives real-world support
-- Use simple and heartfelt language that's wise, warm, and modern
-- Sound like you're texting your best friend who's going through something
-- Empathize first: "Yaar, that must've been tough… 😔"
-- Be real, not robotic - like "Arre, that's so frustrating! 😩"
-- Keep it short and sweet, like real conversations
 
 Response:`;
 
@@ -801,6 +868,19 @@ Response:`;
       };
     } catch (error) {
       console.error('Error generating fallback response, using static response:', error);
+      
+      // If content filter triggered, use safer static responses
+      if (error.message && error.message.includes('CONTENT_FILTER')) {
+        console.warn('🛡️ Content filter in fallback, using safe static response');
+        return {
+          message: language === 'Hindi' ? 'मैं आपकी मदद करने के लिए यहां हूं। कैसा लग रहा है?' : 
+                   language === 'Hinglish' ? 'Main yahan hun आपके लिए। How are you feeling?' :
+                   'I\'m here to support you. How are you feeling?',
+          emotion: 'supportive',
+          language: language,
+          staticFallback: true
+        };
+      }
       
       // Ultra-fallback with more contextual responses
       const getContextualResponse = (userMsg, lang) => {
@@ -856,6 +936,244 @@ Response:`;
       console.log(`✅ Session memory reset for user ${userId}`);
     } catch (error) {
       console.error('❌ Error resetting session memory:', error);
+    }
+  }
+
+  /**
+   * Builds enhanced Sarthi prompt with deep personalization
+   * @param {string} userMessage - Current user message
+   * @param {Object} personalizationContext - Enhanced context data
+   * @returns {string} Personalized system prompt
+   */
+  buildEnhancedSarthiPrompt(userMessage, personalizationContext) {
+    const {
+      currentStressDomain,
+      stressLevel,
+      pastCheckinSummary,
+      languagePreference,
+      userFirstName
+    } = personalizationContext;
+
+    const nameAddress = userFirstName ? userFirstName : 'friend';
+    
+    return `You are Sarthi, the user's trusted emotional wellness companion. Speak like a caring friend.
+
+- The user is currently feeling stress in the ${currentStressDomain} domain.
+- Their recent check-ins show a pattern of: ${pastCheckinSummary}.
+- Their emotional tone is: ${stressLevel}.
+- Speak in ${languagePreference} language with emotionally empathetic tone.
+- Refer to user as "${nameAddress}" if addressing them directly.
+- Include warm emojis occasionally. Show you truly care.
+- Offer practical, personalized advice – not generic tips.
+
+Current Context:
+- Stress Domain: ${currentStressDomain}
+- Stress Level: ${stressLevel} 
+- Language: ${languagePreference}
+- Past Pattern: ${pastCheckinSummary}
+
+Response Guidelines:
+- Use a friendly opening that acknowledges their current state
+- Reflect back what they're going through in the ${currentStressDomain} domain
+- Offer 2-3 practical, empathetic suggestions specific to ${stressLevel} stress level
+- Close with a motivational or caring note
+- Speak naturally in ${languagePreference} with appropriate cultural context
+
+Now respond to: "${userMessage}"`;
+  }
+
+  /**
+   * Stores enhanced interaction with personalization context
+   * @param {string} userId - User ID
+   * @param {string} userMessage - User's message
+   * @param {string} response - AI's response
+   * @param {Object} personalizationContext - Enhanced context data
+   */
+  async storeEnhancedInteraction(userId, userMessage, response, personalizationContext) {
+    try {
+      console.log(`💾 Storing enhanced interaction for user ${userId}`);
+      
+      // Get embedding for the interaction
+      const embedding = await getResponseEmbedding(`${userMessage} ${response}`);
+      
+      if (embedding) {
+        const metadata = {
+          timestamp: new Date().toISOString(),
+          domain: personalizationContext.currentStressDomain,
+          userMessage: userMessage,
+          responseMessage: response,
+          stressLevel: personalizationContext.stressLevel,
+          languagePreference: personalizationContext.languagePreference,
+          userFirstName: personalizationContext.userFirstName,
+          pastCheckinSummary: personalizationContext.pastCheckinSummary,
+          interactionType: 'enhanced_sarthi',
+          enhancedVersion: '1.0'
+        };
+
+        // Store in vector database
+        await upsertUserVector(userId, embedding, metadata);
+        
+        console.log(`✅ Enhanced interaction stored successfully`);
+      }
+    } catch (error) {
+      console.error('❌ Error storing enhanced interaction:', error);
+      // Don't throw error to avoid breaking the flow
+    }
+  }
+
+  /**
+   * Gets user context for enhanced personalization
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} User context object
+   */
+  async getUserContext(userId) {
+    try {
+      if (!userId) return {};
+      
+      // Try to get context from ContextStore if available
+      if (this.chatEngine?.getUserContext) {
+        return await this.chatEngine.getUserContext(userId);
+      }
+      
+      // Fallback: return empty context
+      return {};
+    } catch (error) {
+      console.error('Error getting user context in AgenticAI:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Creates enhanced feedback loop entry with deep personalization context
+   * @param {string} userId - User ID
+   * @param {string} userMessage - User's message
+   * @param {string} response - AI's response
+   * @param {Object} personalizationContext - Enhanced context data
+   */
+  async createEnhancedFeedbackEntry(userId, userMessage, response, personalizationContext) {
+    try {
+      console.log(`📝 Creating enhanced feedback entry for user ${userId}`);
+      
+      // Calculate sentiment score
+      const sentimentScore = this.calculateSentimentScore(userMessage, response);
+      
+      // Get embedding for the feedback entry
+      const embedding = await getResponseEmbedding(`${userMessage} ${response}`);
+      
+      if (embedding) {
+        const feedbackMetadata = {
+          timestamp: new Date().toISOString(),
+          domain: personalizationContext.currentStressDomain,
+          emotion: personalizationContext.stressLevel,
+          messageSummary: userMessage.substring(0, 100), // First 100 chars
+          llmResponse: response.substring(0, 200), // First 200 chars
+          sentimentScore: sentimentScore,
+          languagePreference: personalizationContext.languagePreference,
+          userFirstName: personalizationContext.userFirstName,
+          pastCheckinSummary: personalizationContext.pastCheckinSummary,
+          feedbackType: 'enhanced_sarthi_feedback',
+          interactionQuality: this.assessInteractionQuality(userMessage, response),
+          personalizationLevel: this.calculatePersonalizationLevel(personalizationContext),
+          memoryUsage: personalizationContext.rawData?.surveyHistory?.length || 0,
+          responseQuality: 'pending_user_feedback' // To be updated when user provides feedback
+        };
+
+        // Store feedback entry in vector database
+        await upsertUserVector(userId, embedding, feedbackMetadata);
+        
+        console.log(`✅ Enhanced feedback entry created successfully`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating enhanced feedback entry:', error);
+      // Don't throw error to avoid breaking the flow
+    }
+  }
+
+  /**
+   * Calculates sentiment score from user message and AI response
+   * @param {string} userMessage - User's message
+   * @param {string} response - AI's response
+   * @returns {number} Sentiment score between 0-10
+   */
+  calculateSentimentScore(userMessage, response) {
+    try {
+      // Simple sentiment analysis based on keywords
+      const userWords = userMessage.toLowerCase();
+      const responseWords = response.toLowerCase();
+      
+      // Negative indicators
+      const negativeWords = ['sad', 'depressed', 'anxious', 'stressed', 'worried', 'upset', 'frustrated', 'angry', 'tired', 'overwhelmed'];
+      const positiveWords = ['happy', 'good', 'better', 'great', 'excellent', 'calm', 'peaceful', 'confident', 'hopeful', 'grateful'];
+      
+      let score = 5; // Neutral starting point
+      
+      // Check user message sentiment
+      negativeWords.forEach(word => {
+        if (userWords.includes(word)) score -= 1;
+      });
+      
+      positiveWords.forEach(word => {
+        if (userWords.includes(word)) score += 1;
+      });
+      
+      // Check response sentiment (AI should be supportive)
+      if (responseWords.includes('understand') || responseWords.includes('support') || responseWords.includes('help')) {
+        score += 0.5;
+      }
+      
+      // Clamp between 0-10
+      return Math.max(0, Math.min(10, score));
+    } catch (error) {
+      console.error('Error calculating sentiment score:', error);
+      return 5; // Default neutral score
+    }
+  }
+
+  /**
+   * Assesses the quality of the interaction
+   * @param {string} userMessage - User's message
+   * @param {string} response - AI's response
+   * @returns {string} Quality assessment
+   */
+  assessInteractionQuality(userMessage, response) {
+    try {
+      const responseLength = response.length;
+      const hasEmojis = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/u.test(response);
+      const hasPersonalization = response.toLowerCase().includes('you') || response.toLowerCase().includes('your');
+      
+      if (responseLength > 100 && hasEmojis && hasPersonalization) {
+        return 'high';
+      } else if (responseLength > 50 && (hasEmojis || hasPersonalization)) {
+        return 'medium';
+      } else {
+        return 'low';
+      }
+    } catch (error) {
+      console.error('Error assessing interaction quality:', error);
+      return 'medium';
+    }
+  }
+
+  /**
+   * Calculates personalization level based on context richness
+   * @param {Object} personalizationContext - Enhanced context data
+   * @returns {number} Personalization level 1-10
+   */
+  calculatePersonalizationLevel(personalizationContext) {
+    try {
+      let level = 1;
+      
+      if (personalizationContext.userFirstName) level += 2;
+      if (personalizationContext.currentStressDomain !== 'General') level += 2;
+      if (personalizationContext.stressLevel !== 'Low') level += 1;
+      if (personalizationContext.pastCheckinSummary !== 'This seems like a new experience for you') level += 2;
+      if (personalizationContext.languagePreference !== 'English') level += 1;
+      if (personalizationContext.rawData?.surveyHistory?.length > 0) level += 1;
+      
+      return Math.min(10, level);
+    } catch (error) {
+      console.error('Error calculating personalization level:', error);
+      return 5;
     }
   }
 

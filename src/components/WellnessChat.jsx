@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import mcpService from '../services/mcp';
 import { ContextStore } from '../services/firebase';
 import { ChevronRight, Brain, Heart, DollarSign, Activity, User, CheckCircle, RotateCcw } from 'lucide-react';
+import LanguageToggle from './LanguageToggle';
 
 const WellnessChat = ({ userId }) => {
   const [messages, setMessages] = useState([]);
@@ -9,15 +10,41 @@ const WellnessChat = ({ userId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [userContext, setUserContext] = useState(null);
+  const [currentLanguage, setCurrentLanguage] = useState('Hinglish');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     loadUserContext();
+    loadLanguagePreference();
   }, [userId]);
 
   const loadUserContext = async () => {
     const context = await ContextStore.getUserContext(userId);
     setUserContext(context);
+  };
+
+  const loadLanguagePreference = () => {
+    if (userId) {
+      const savedLanguage = localStorage.getItem(`manova_language_${userId}`);
+      if (savedLanguage) {
+        setCurrentLanguage(savedLanguage);
+      }
+    }
+  };
+
+  const handleLanguageChange = async (newLanguage) => {
+    setCurrentLanguage(newLanguage);
+    
+    // Update user context with new language preference
+    try {
+      await ContextStore.updateUserContext(userId, {
+        languagePreference: newLanguage
+      });
+      console.log(`✅ Language preference updated to: ${newLanguage}`);
+    } catch (error) {
+      console.error('Error updating language preference:', error);
+    }
   };
 
 
@@ -35,10 +62,25 @@ const WellnessChat = ({ userId }) => {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
+    setIsTyping(true);
+
+    // Add typing animation delay
+    setTimeout(() => {
+      setIsTyping(false);
+    }, 1000);
 
     try {
-      const response = await mcpService.generateResponse(userId, userMessage);
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      const response = await mcpService.generateResponse(userId, userMessage, currentLanguage);
+      
+      // Extract message from response object if needed
+      const messageContent = typeof response === 'object' ? response.message || response.content || response : response;
+      
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: messageContent,
+        context: typeof response === 'object' ? response.context : null,
+        sarthiEnhanced: typeof response === 'object' ? response.sarthiEnhanced : false
+      }]);
       await loadUserContext(); // Refresh context after new message
     } catch (error) {
       console.error('Error generating response:', error);
@@ -48,6 +90,7 @@ const WellnessChat = ({ userId }) => {
       }]);
     } finally {
       setIsLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -63,7 +106,13 @@ const WellnessChat = ({ userId }) => {
     <div className="flex flex-col h-full max-w-2xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Wellness Assistant</h2>
-        <div className="space-x-2">
+        <div className="flex items-center space-x-2">
+          <LanguageToggle
+            currentLanguage={currentLanguage}
+            onLanguageChange={handleLanguageChange}
+            userId={userId}
+            className="mr-2"
+          />
           <button
             onClick={() => setShowContext(!showContext)}
             className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"

@@ -99,10 +99,10 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <MessageCircle className="h-5 w-5 mr-2 text-blue-600" />
+          <h3 className="text-lg font-semibold text-black flex items-center">
+            <MessageCircle className="h-5 w-5 mr-2 text-[#007CFF]" />
             Recent Chats
           </h3>
         </div>
@@ -125,15 +125,15 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <MessageCircle className="h-5 w-5 mr-2 text-blue-600" />
+          <h3 className="text-lg font-semibold text-black flex items-center">
+            <MessageCircle className="h-5 w-5 mr-2 text-[#007CFF]" />
             Recent Chats
           </h3>
           <button
             onClick={handleRefresh}
-            className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+            className="p-2 text-[#777] hover:text-black rounded-2xl hover:bg-gray-50"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -142,7 +142,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
           <p className="text-red-600 text-sm">{error}</p>
           <button
             onClick={handleRefresh}
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            className="mt-2 px-4 py-2 bg-[#007CFF] hover:bg-[#0066CC] text-white rounded-2xl text-sm"
           >
             Try Again
           </button>
@@ -152,13 +152,13 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          <MessageCircle className="h-5 w-5 mr-2 text-blue-600" />
+        <h3 className="text-lg font-semibold text-black flex items-center">
+          <MessageCircle className="h-5 w-5 mr-2 text-[#007CFF]" />
           Recent Chats
           {chatHistory.length > 0 && (
-            <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+            <span className="ml-2 px-2 py-1 text-xs bg-blue-50 text-[#007CFF] rounded-full border border-blue-100">
               {chatHistory.length}
             </span>
           )}
@@ -166,7 +166,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+          className="p-2 text-[#777] hover:text-black rounded-2xl hover:bg-gray-50 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
@@ -174,9 +174,9 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
 
       {chatHistory.length === 0 ? (
         <div className="text-center py-8">
-          <Sparkles className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No chat history yet</p>
-          <p className="text-gray-400 text-xs mt-1">Start a conversation with Sarthi!</p>
+          <Sparkles className="h-12 w-12 text-[#777] mx-auto mb-3" />
+          <p className="text-[#777] text-sm">No chat history yet</p>
+          <p className="text-[#777] text-xs mt-1">Start a conversation with Sarthi!</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -188,20 +188,20 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ delay: index * 0.1 }}
-                className="group border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all duration-200 cursor-pointer"
+                className="group border border-[#D8D8D8] rounded-2xl p-4 hover:border-[#007CFF] hover:shadow-sm transition-all duration-200 cursor-pointer"
                 onClick={() => handleResumeChat(session.sessionId)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-3 flex-1">
                     {/* Session Icon */}
-                    <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                      <MessageCircle className="h-4 w-4 text-blue-600" />
+                    <div className="p-2 bg-blue-50 rounded-2xl group-hover:bg-blue-100 transition-colors">
+                      <MessageCircle className="h-4 w-4 text-[#007CFF]" />
                     </div>
                     
                     {/* Session Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-sm font-medium text-gray-900 truncate">
+                        <span className="text-sm font-medium text-black truncate">
                           {session.summary || 'Chat Session'}
                         </span>
                         <span className="text-xs">
@@ -210,12 +210,12 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
                       </div>
                       
                       {session.preview && (
-                        <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                        <p className="text-xs text-[#777] line-clamp-2 mb-2">
                           {session.preview}
                         </p>
                       )}
                       
-                      <div className="flex items-center space-x-3 text-xs text-gray-500">
+                      <div className="flex items-center space-x-3 text-xs text-[#777]">
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-3 w-3" />
                           <span>{formatDate(session.lastUpdated)}</span>
@@ -237,7 +237,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
-                    <div className="p-2 bg-blue-600 text-white rounded-lg">
+                    <div className="p-2 bg-[#007CFF] text-white rounded-2xl">
                       <ChevronRight className="h-4 w-4" />
                     </div>
                   </motion.div>
@@ -249,8 +249,8 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
       )}
       
       {chatHistory.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
+        <div className="mt-4 pt-4 border-t border-[#D8D8D8]">
+          <p className="text-xs text-[#777] text-center">
             Click any chat to resume where you left off
           </p>
         </div>

@@ -627,6 +627,7 @@ const DeepDiveFollowup = ({
   const [customReason, setCustomReason] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisFeedback, setAnalysisFeedback] = useState('');
+  const [showMobileTips, setShowMobileTips] = useState(false);
   const [typingDots, setTypingDots] = useState('');
   const [aiSummary, setAiSummary] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -652,6 +653,7 @@ const DeepDiveFollowup = ({
   const [questionReflections, setQuestionReflections] = useState({});
   const [personalizedSuggestions, setPersonalizedSuggestions] = useState([]);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   // Per-question suggestion data state management
   const [questionSuggestions, setQuestionSuggestions] = useState({});
@@ -887,14 +889,13 @@ Respond in this exact JSON format:
       // Show a brief positive message before continuing
       setAnalysisFeedback('Great! No significant stress concerns detected in this domain.');
       
-      setTimeout(() => {
-        if (goToNextDomain && typeof goToNextDomain === 'function') {
-          goToNextDomain();
-        } else {
-          // Fallback to onSave if goToNextDomain is not provided
-          onSave({ continue: true, skip: true });
-        }
-      }, 2000);
+      // 🔥 IMMEDIATE: Continue to next domain without delay
+      if (goToNextDomain && typeof goToNextDomain === 'function') {
+        goToNextDomain();
+      } else {
+        // Fallback to onSave if goToNextDomain is not provided
+        onSave({ continue: true, skip: true });
+      }
       
       return;
     }
@@ -1333,27 +1334,28 @@ Respond in this JSON format:
   };
 
   const handleContinue = async () => {
+    // Prevent double-clicking
+    if (isTransitioning) {
+      console.log('🚫 Transition already in progress, ignoring click');
+      return;
+    }
+
     const globalTagValues = getSelectedTagValues();
     if (!userId || !domainName || (globalTagValues.length === 0 && !customReason.trim())) {
       setValidationError('Please select at least one reason or provide a custom response before continuing.');
       return;
     }
 
-    console.log("Saving selections:", globalTagValues);
+    console.log("💾 Saving selections:", globalTagValues);
+
+    // Set transitioning state immediately to prevent double-clicks
+    setIsTransitioning(true);
 
     try {
-      // Persist to Firestore or context
-      await saveContributorsToDB(userId, domainName, globalTagValues);
+      // Clear current UI state first for immediate visual feedback
+      setValidationError('');
       
-      // Save stress triggers to vector memory
-      await saveStressTriggersToMemory({
-        userId: userId,
-        domain: domainName,
-        selectedTriggers: globalTagValues,
-        customInputText: customReason || "",
-      });
-      
-      // Save deep dive insight as before
+      // Prepare final insights data
       const finalInsights = {
         userId,
         domain: domainName,
@@ -1363,19 +1365,46 @@ Respond in this JSON format:
         timestamp: new Date().toISOString(),
         continue: true
       };
-      await saveDeepDiveInsight(userId, domainName, sanitizeData(finalInsights));
+
+      // Run all save operations in parallel for faster performance
+      const savePromises = [
+        saveContributorsToDB(userId, domainName, globalTagValues),
+        saveStressTriggersToMemory({
+          userId: userId,
+          domain: domainName,
+          selectedTriggers: globalTagValues,
+          customInputText: customReason || "",
+        }),
+        saveDeepDiveInsight(userId, domainName, sanitizeData(finalInsights))
+      ];
+
+      // Execute all saves in parallel
+      console.log('⚡ Executing parallel saves for faster transition...');
+      await Promise.all(savePromises);
+      
       // Clear state for current domain
       setSelectedStressTags([]);
       setCustomReason('');
       setAiSummary('');
       setIsComplete(false);
-      setValidationError('');
-      // Trigger next domain
-      if (goToNextDomain) goToNextDomain();
-      else await onSave(finalInsights);
+      
+      console.log('✅ All data saved successfully, transitioning to next domain...');
+      
+      // Trigger next domain immediately
+      if (goToNextDomain) {
+        goToNextDomain();
+      } else {
+        await onSave(finalInsights);
+      }
+      
+      // Reset transitioning state after successful completion
+      setIsTransitioning(false);
+      
     } catch (error) {
-      console.error('Error saving deep dive insights or contributors:', error);
+      console.error('❌ Error saving deep dive insights or contributors:', error);
       setValidationError('Failed to save your insights. Please try again.');
+      // Reset transitioning state on error
+      setIsTransitioning(false);
     }
   };
 
@@ -1593,13 +1622,13 @@ Respond in this JSON format:
     
     // No questions to show - automatically continue to next domain
     console.log('✅ No deep dive questions found. Continuing to next domain.');
-    setTimeout(() => {
-      if (goToNextDomain && typeof goToNextDomain === 'function') {
-        goToNextDomain();
-      } else {
-        onSave({ continue: true, skip: true });
-      }
-    }, 1000);
+    
+    // 🔥 IMMEDIATE: Continue to next domain without delay
+    if (goToNextDomain && typeof goToNextDomain === 'function') {
+      goToNextDomain();
+    } else {
+      onSave({ continue: true, skip: true });
+    }
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-purple-50 font-body flex items-center justify-center">
@@ -1618,57 +1647,53 @@ Respond in this JSON format:
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/30 font-body">
       {/* Full Width Container - Edge to Edge Design */}
       <div className="w-full">
-        {/* Main Grid Layout - Responsive 2-column design */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-8 xl:gap-12 min-h-screen">
-          
-          {/* Main Content Area - Questions and Form */}
-          <div className="bg-transparent">
+        {/* Deep Dive Block with Soft Pastel Background */}
+        <div className="p-6" style={{backgroundColor: '#FFF7F0'}}>
+          {/* Flex Layout - Main content and Sidebar */}
+          <div className="flex flex-row gap-6 min-h-screen">
+            
+            {/* Main Content Area - Questions and Form */}
+            <div className="w-2/3 bg-transparent">
             {/* Mobile Header - Only shown on mobile */}
-            <div className="xl:hidden bg-gradient-to-r from-blue-50 via-purple-50/50 to-blue-50 px-4 py-6 border-b border-gray-100 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
-                    Deep Dive: {domainName}
-                  </h1>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    Let's explore what's contributing to your stress
-                  </p>
-                </div>
-                {deepDiveData?.rootEmotion && (
+            <div className="xl:hidden px-4 py-4 mb-4">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">What's Causing Your Stress?</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {domainName} – Let's explore what's been building up emotionally.
+                </p>
+              </div>
+              {deepDiveData?.rootEmotion && (
+                <div className="flex justify-center">
                   <span className="inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium bg-white/90 text-blue-700 backdrop-blur-sm border border-blue-200 shadow-sm">
                     {renderEmotionIcon(deepDiveData.rootEmotion)}
                     <span className="ml-2">{deepDiveData.rootEmotion}</span>
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Desktop Header - Only shown on desktop */}
-            <div className="hidden xl:block mb-8 px-4 xl:px-8">
-              <div className="bg-gradient-to-r from-blue-50 via-purple-50/50 to-blue-50 rounded-3xl px-8 py-8 border border-gray-100 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 leading-tight">
-                      Deep Dive: {domainName}
-                    </h1>
-                    <p className="text-lg text-gray-600 leading-relaxed">
-                      Let's explore what's contributing to your stress
-                    </p>
-                  </div>
-                  {deepDiveData?.rootEmotion && (
-                    <motion.span
-                      initial={false}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={false}
-                      transition={{ duration: 0.15 }}
-                      className="inline-flex items-center px-4 py-2 rounded-xl text-base font-medium bg-white/90 text-blue-700 backdrop-blur-sm border border-blue-200 shadow-sm"
-                    >
-                      {renderEmotionIcon(deepDiveData.rootEmotion)}
-                      <span className="ml-2">{deepDiveData.rootEmotion}</span>
-                    </motion.span>
-                  )}
-                </div>
+            <div className="hidden xl:block mb-6 px-4 xl:px-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">What's Causing Your Stress?</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {domainName} – Let's explore what's been building up emotionally.
+                </p>
               </div>
+              {deepDiveData?.rootEmotion && (
+                <div className="flex justify-center">
+                  <motion.span
+                    initial={false}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={false}
+                    transition={{ duration: 0.15 }}
+                    className="inline-flex items-center px-4 py-2 rounded-xl text-base font-medium bg-white/90 text-blue-700 backdrop-blur-sm border border-blue-200 shadow-sm"
+                  >
+                    {renderEmotionIcon(deepDiveData.rootEmotion)}
+                    <span className="ml-2">{deepDiveData.rootEmotion}</span>
+                  </motion.span>
+                </div>
+              )}
             </div>
 
             {/* Questions and Form Content */}
@@ -1678,36 +1703,11 @@ Respond in this JSON format:
                 animate={{ opacity: 1, y: 0 }}
                 exit={false}
                 transition={{ duration: 0.2 }}
-                className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden"
+                className="bg-white rounded-3xl shadow-lg border border-gray-100"
               >
-                {/* Content Header */}
-                <div className="bg-gradient-to-r from-blue-50 via-purple-50/50 to-blue-50 px-6 lg:px-8 py-6 lg:py-8 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2 leading-tight">
-                        Deep Dive Analysis
-                      </h2>
-                      <p className="text-base lg:text-lg text-gray-600 leading-relaxed">
-                        Understanding your stress patterns
-                      </p>
-                    </div>
-                    {deepDiveData?.rootEmotion && (
-                      <motion.span
-                        initial={false}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={false}
-                  transition={{ duration: 0.15 }}
-                        className="inline-flex items-center px-4 py-2 rounded-xl text-sm lg:text-base font-medium bg-white/90 text-blue-700 backdrop-blur-sm border border-blue-200 shadow-sm"
-                >
-                  {renderEmotionIcon(deepDiveData.rootEmotion)}
-                      <span className="ml-2">{deepDiveData.rootEmotion}</span>
-                </motion.span>
-              )}
-            </div>
-          </div>
 
-              {/* Content - Scrollable if needed */}
-                <div className="px-6 lg:px-8 py-6 lg:py-8 max-h-[70vh] overflow-y-auto">
+              {/* Content - Now expands naturally without fixed height */}
+                <div className="px-6 lg:px-8 py-6 lg:py-8">
                   {/* Motivational Quote - Enhanced styling */}
                 <motion.div
                   initial={false}
@@ -1731,94 +1731,107 @@ Respond in this JSON format:
                   </div>
                 </motion.div>
 
-                  {/* Stressed Questions - Calm, Uniform, Professional Card Layout */}
+                  {/* Stressed Questions - Enhanced Card Layout with better spacing */}
+                  <div className="space-y-4">
                   {questionsToShow.map((q, idx) => (
                     <div
                     key={q.id}
-                      className={
-                        `flex flex-col gap-1 py-3 px-4 mb-2 bg-white/90 border-b border-gray-200 last:border-b-0 rounded-xl` +
-                        (idx === 0 ? ' mt-2' : '')
-                      }
+                      className="rounded-2xl shadow-md p-6 mb-6 bg-white border border-gray-100"
                     >
-                      {/* Top Row: Question and Stress Badge */}
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="font-semibold text-base text-gray-800 flex-1">
+                      {/* ❓ Question Text - bold, larger font */}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center">
+                          <span className="mr-2">❓</span>
                           {q.text}
-                      </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        </h3>
+                        <div className="flex items-center gap-2">
                           {/* Stress Score Badge */}
                           {(q.stressScore || q.aiAnalysis?.enhanced?.score) && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
                               Score: {q.aiAnalysis?.enhanced?.score || q.stressScore}/10
-                        </span>
+                            </span>
                           )}
                           {/* Stress Tag */}
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                        {(() => {
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                            {(() => {
                               const score = q.aiAnalysis?.enhanced?.score || q.stressScore || 0;
                               if (score >= 8) return 'High Stress';
                               if (score >= 5) return 'Moderate Stress';
-                          return 'Low Stress';
-                        })()}
+                              return 'Low Stress';
+                            })()}
                           </span>
+                        </div>
                       </div>
-                    </div>
-                      {/* User Answer */}
+
+                      {/* 💬 User's Answer - lighter font, italic */}
                       {q.selectedOption && (
-                        <div className="text-base font-medium text-gray-600 mb-1">
-                          <span className="font-medium text-gray-700">Your answer:</span> {q.selectedOption}
-                      </div>
-                    )}
-                      {/* Empathy Line */}
+                        <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+                          <div className="flex items-center mb-2">
+                            <span className="mr-2">💬</span>
+                            <span className="font-medium text-gray-700 text-sm">Your Answer:</span>
+                          </div>
+                          <p className="text-gray-600 italic font-light">{q.selectedOption}</p>
+                        </div>
+                      )}
+
+                      {/* 💡 AI Insight - light blue bubble with card elevation */}
                       {empatheticLines[q.id] && (
-                        <div className="flex items-center gap-1 text-sm italic text-gray-500 mb-1">
-                          <Heart className="w-4 h-4 text-gray-300" />
-                          <span>"{empatheticLines[q.id]}"</span>
-                  </div>
-                )}
-                      {/* Stress Contributors Dropdown (inline, compact) */}
+                        <div className="mb-4 p-4 bg-blue-50 rounded-xl border border-blue-100 shadow-sm">
+                          <div className="flex items-center mb-2">
+                            <span className="mr-2">💡</span>
+                            <span className="font-medium text-blue-700 text-sm">AI Insight:</span>
+                          </div>
+                          <p className="text-blue-700 italic">"{empatheticLines[q.id]}"</p>
+                        </div>
+                      )}
+
+                      {/* 📌 Contributors Dropdown - refined with card elevation */}
                       {questionStressContributors[q.id] && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <Target className="w-4 h-4 text-orange-200" />
-                          <span className="text-sm text-gray-500 font-medium mr-2">Contributors:</span>
-                          <div className="flex-1 min-w-0">
+                        <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-100 shadow-sm">
+                          <div className="flex items-center mb-3">
+                            <span className="mr-2">📌</span>
+                            <span className="font-medium text-orange-700 text-sm">What's Contributing to This?</span>
+                          </div>
                           <DeepDiveUI
                             stressOptions={questionStressContributors[q.id]}
                             selectedStressTags={selectedTags[q.id] || []}
                             onStressTagsChange={(tags) => handleTagsChange(q.id, tags)}
                             maxSelections={3}
-                              placeholder="Choose stress contributors..."
-                              className="w-full"
-                            />
-                          </div>
+                            placeholder="Choose stress contributors..."
+                            className="w-full"
+                            questionId={q.id}
+                            isLoading={loadingOptions[q.id] || false}
+                          />
                         </div>
                       )}
-                      {/* Per-Question Suggestions Section (compact) */}
+
+                      {/* ✅ Suggestions - bulleted with green tick icons and card elevation */}
                       {(questionSuggestions[q.id] || questionLoadingStates[q.id]) && (
-                        <div className="mt-2">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Lightbulb className="w-4 h-4 text-emerald-200" />
-                            <span className="text-sm text-gray-500 font-semibold">Suggestions:</span>
-                            </div>
-                          {questionLoadingStates[q.id] ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-200"></div>
-                              Generating personalized suggestions...
+                        <div className="p-4 bg-green-50 rounded-xl border border-green-100 shadow-sm">
+                          <div className="flex items-center mb-3">
+                            <span className="mr-2">✅</span>
+                            <span className="font-medium text-green-700 text-sm">Suggestions:</span>
                           </div>
+                          {questionLoadingStates[q.id] ? (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                              Generating personalized suggestions...
+                            </div>
                           ) : questionSuggestions[q.id] ? (
-                            <ul className="space-y-1">
+                            <ul className="space-y-2">
                               {questionSuggestions[q.id].map((suggestion, index) => (
-                                <li key={index} className="flex items-start text-sm text-gray-700">
-                                  <span className="text-emerald-400 mr-2 font-bold">•</span>
+                                <li key={index} className="flex items-start text-sm text-green-700">
+                                  <CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                                   <span>{suggestion}</span>
-                              </li>
-                            ))}
-                          </ul>
+                                </li>
+                              ))}
+                            </ul>
                           ) : null}
                         </div>
                       )}
                         </div>
             ))}
+                  </div>
 
                   {/* Input Section - Enhanced styling */}
                   <div className="space-y-8">
@@ -1871,7 +1884,7 @@ Respond in this JSON format:
                       onClick={() => onSave({ continue: true, skip: true })}
                         className="text-base lg:text-lg text-gray-500 hover:text-gray-700 transition-colors font-medium"
                     >
-                      Skip Deep Dive
+                      Skip Analysis
                     </button>
                   </div>
             </div>
@@ -1883,9 +1896,9 @@ Respond in this JSON format:
                     animate={{ opacity: 1, y: 0 }}
                     exit={false}
                     transition={{ duration: 0.15 }}
-                      className="mt-8 p-6 lg:p-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-lg"
+                      className="mt-8 p-6 lg:p-8 bg-gradient-to-br from-purple-50 via-lavender-50 to-blue-50 rounded-2xl border border-purple-100 shadow-lg shadow-purple-100/50 relative"
                     >
-                      <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center mb-6">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
                             <Heart className="w-6 h-6 text-white" />
@@ -1900,7 +1913,7 @@ Respond in this JSON format:
                         </div>
                       </div>
                   
-                      {/* MCP Protocol Indicator */}
+                      {/* MCP Protocol Indicator - Floating top-right */}
                       {(() => {
                         const mcpLevel = selectedStressTags.length >= 3 ? 'Escalate' : 
                                        selectedStressTags.length >= 2 ? 'Monitor' : 'Support';
@@ -1910,18 +1923,11 @@ Respond in this JSON format:
                           'Escalate': 'bg-red-100 text-red-700 border-red-200'
                         };
                         
-                        const mcpDescriptions = {
-                          'Support': 'General support needed',
-                          'Monitor': 'Moderate concerns',
-                          'Escalate': 'High priority support'
-                        };
-                        
                         return (
-                          <div className="text-right">
-                              <div className={`px-4 py-2 rounded-xl text-sm lg:text-base font-bold border shadow-sm ${mcpColors[mcpLevel]}`}>
+                          <div className="absolute top-4 right-4">
+                              <div className={`px-3 py-1 rounded-full text-xs font-bold border shadow-sm ${mcpColors[mcpLevel]}`}>
                               MCP: {mcpLevel}
                             </div>
-                              <p className="text-sm text-gray-500 mt-2">{mcpDescriptions[mcpLevel]}</p>
                           </div>
                         );
                       })()}
@@ -1985,12 +1991,12 @@ Respond in this JSON format:
 
                       {/* New Therapist Insight from generateTherapistInsight */}
                       {therapistAdvice && (
-                        <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 shadow-sm">
+                        <div className="p-6 bg-gradient-to-br from-lavender-50 via-purple-50 to-indigo-50 rounded-xl border border-lavender-200 shadow-md shadow-lavender-100/30">
                           <div className="flex items-center space-x-3 mb-4">
-                            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                            <div className="w-8 h-8 bg-gradient-to-br from-lavender-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
                               <MessageCircle className="w-4 h-4 text-white" />
                             </div>
-                            <p className="text-indigo-900 font-bold text-lg">🤗 AI Therapist Insight</p>
+                            <p className="text-lavender-900 font-bold text-lg">🤗 AI Therapist Insight</p>
                           </div>
                           <p className="text-gray-700 leading-relaxed italic">
                             "{therapistAdvice}"
@@ -1998,57 +2004,111 @@ Respond in this JSON format:
                         </div>
                       )}
 
-                      {/* Personalized Suggestions */}
-                      {personalizedSuggestions.length > 0 && (
-                        <div className="p-6 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 shadow-sm">
-                          <div className="flex items-center space-x-3 mb-4">
-                            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                              <Lightbulb className="w-4 h-4 text-white" />
-                            </div>
-                            <p className="text-emerald-900 font-bold text-lg">Here's something that might help you 👇</p>
-                          </div>
-                          {isGeneratingSuggestions ? (
-                            <div className="flex items-center space-x-3">
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600"></div>
-                              <p className="text-emerald-700">Generating personalized suggestions...</p>
-                            </div>
-                          ) : (
-                            <div className="grid gap-4 md:grid-cols-3">
-                              {personalizedSuggestions.map((item, index) => (
-                                <div key={index} className="bg-white/80 border border-emerald-200 rounded-xl p-4 shadow-sm flex flex-col h-full">
-                                  <div className="flex items-center mb-2">
-                                    <span className="text-emerald-600 text-xl mr-2">•</span>
-                                    <span className="font-semibold text-gray-800">{item.suggestion}</span>
-                                  </div>
-                                  <div className="text-gray-600 text-sm mb-2">
-                                    <span className="font-medium">Why this helps: </span>{item.why}
-                                  </div>
-                                  <div className="mt-auto text-xs text-emerald-700 font-semibold">Timeframe: {item.timeframe}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
                   </div>
 
-                    <button
+                    <motion.button
                       onClick={handleContinue}
-                        className="w-full mt-8 py-4 lg:py-6 px-6 lg:px-8 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-bold hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center shadow-lg hover:shadow-xl text-base lg:text-lg"
-                      disabled={isLoading || (selectedStressTags.length === 0 && !customReason.trim())}
+                      className={`mx-auto mt-6 block w-fit py-6 lg:py-8 px-8 lg:px-10 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 text-white rounded-2xl font-bold hover:from-emerald-600 hover:via-teal-600 hover:to-blue-600 transition-all flex items-center justify-center shadow-xl hover:shadow-2xl text-lg lg:text-xl ${isTransitioning || (getSelectedTagValues().length === 0 && !customReason.trim()) ? 'opacity-70 cursor-not-allowed' : 'opacity-100'}`}
+                      disabled={isLoading || isTransitioning || (getSelectedTagValues().length === 0 && !customReason.trim())}
+                      whileHover={{ scale: isTransitioning ? 1 : 1.02 }}
+                      whileTap={{ scale: isTransitioning ? 1 : 0.98 }}
                     >
-                        <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6 mr-3" />
-                      Continue to Next Section
-                    </button>
+                      {isTransitioning ? (
+                        <>
+                          <Loader2 className="w-6 h-6 lg:w-7 lg:h-7 mr-3 animate-spin" />
+                          Transitioning...
+                        </>
+                      ) : (
+                        <>
+                          Continue to Next Section
+                          <ChevronRight className="w-6 h-6 lg:w-7 lg:h-7 ml-3" />
+                        </>
+                      )}
+                    </motion.button>
               </motion.div>
             )}
               </div>
               </motion.div>
             </div>
+
+            {/* Mobile Tips and Help Section - Collapsible for screens <768px */}
+            <div className="xl:hidden px-4 mt-6">
+              <button
+                onClick={() => setShowMobileTips(!showMobileTips)}
+                className="w-full flex items-center justify-between p-4 bg-white rounded-xl shadow-md border border-gray-100 mb-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <Lightbulb className="w-5 h-5 text-green-500" />
+                  <span className="font-medium text-gray-900">Tips & Help</span>
+                </div>
+                <motion.div
+                  animate={{ rotate: showMobileTips ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </motion.div>
+              </button>
+
+              <AnimatePresence>
+                {showMobileTips && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-4 overflow-hidden"
+                  >
+                    {/* Tips Card */}
+                    <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                          <Lightbulb className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="font-bold text-gray-900">Tips</h3>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" />
+                          <p className="text-sm text-gray-600">Be honest with your responses for better insights</p>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" />
+                          <p className="text-sm text-gray-600">Take your time to reflect on each question</p>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" />
+                          <p className="text-sm text-gray-600">Share additional thoughts for personalized support</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Need Help Card */}
+                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-100 p-4">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <Heart className="w-4 h-4 text-white" />
+                        </div>
+                        <h3 className="font-bold text-blue-900">Need Help?</h3>
+                      </div>
+
+                      <p className="text-sm text-blue-700 mb-3">
+                        Remember, this is a safe space. Your responses help us provide better support.
+                      </p>
+                      
+                      <div className="flex items-center space-x-2 text-sm text-blue-600">
+                        <Shield className="w-4 h-4" />
+                        <span>Your data is secure and private</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* Sidebar - Enhanced styling with proper grid positioning */}
-          <div className="hidden xl:block w-full space-y-6 px-4">
+            {/* Sidebar - Enhanced styling with flex positioning */}
+            <aside className="w-1/3 sticky top-10 h-fit space-y-6">
             {/* Progress Card */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -2142,6 +2202,7 @@ Respond in this JSON format:
                 <span>Your data is secure and private</span>
               </div>
             </motion.div>
+            </aside>
           </div>
         </div>
       </div>

@@ -40,6 +40,9 @@ export const saveCheckinData = async (userId, surveyData) => {
     timestamp: new Date().toISOString(),
     responses: surveyData.responses,
     stressScore: surveyData.stressScore,
+    wellnessScore: surveyData.wellnessScore,
+    mood: surveyData.mood,
+    domainResponses: surveyData.domainResponses,
     emotionSummary: surveyData.emotionSummary || null
   });
 

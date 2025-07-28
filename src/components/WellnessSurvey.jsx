@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, Brain, Heart, DollarSign, Activity, User, CheckCircle, RotateCcw, MessageCircle, TrendingUp, Calendar, Phone, AlertCircle, Clock, Info, Lightbulb, Target } from 'lucide-react';
 // Navbar is now handled globally in App.jsx
 import DeepDiveFollowup from './DeepDiveFollowup';
@@ -35,6 +36,7 @@ import {
 
 // Enhanced Wellness Survey with properly aligned questions
 const WellnessSurvey = ({ userId = "demo-user-123" }) => {
+  const navigate = useNavigate();
   const [currentDomain, setCurrentDomain] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [responses, setResponses] = useState({});
@@ -524,11 +526,197 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
     }
   }, [currentDomain, currentQuestion, isComplete, showFollowUp]);
 
+  // Reset loading state when question changes
+  useEffect(() => {
+    setIsAnalyzingStress(false);
+  }, [currentQuestion, currentDomain]);
+
+  // Keyboard event handler to prevent multiple responses
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const currentQuestionId = domains[currentDomain]?.questions[currentQuestion]?.id;
+      if (event.key === 'Enter' && !isAnalyzingStress && responses[currentQuestionId] !== undefined) {
+        handleNext();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAnalyzingStress, responses, currentDomain, currentQuestion]);
+
   // Set AI message instantly without typing effect
   useEffect(() => {
     if (!aiIntroText) return;
     setAiMessage(aiIntroText);
   }, [aiIntroText]);
+
+  // 🔥 NEW: Immediate DeepDive trigger when domain is completed
+  useEffect(() => {
+    const checkDomainCompletion = async () => {
+      // Check if we're at the last question of the current domain
+      const isLastQuestion = currentQuestion === domains[currentDomain]?.questions.length - 1;
+      const hasResponse = responses[domains[currentDomain]?.questions[currentQuestion]?.id] !== undefined;
+      
+      if (isLastQuestion && hasResponse && !showDeepDive && !isComplete) {
+        console.log(`🚀 Domain ${domains[currentDomain].name} completed - triggering immediate DeepDive check`);
+        
+        // Build stressedQuestions array for deep dive using AI stress analysis
+        const allQuestions = domains[currentDomain].questions
+          .map(q => {
+            const score = responses[q.id];
+            const questionStressAnalysis = stressAnalysis[q.id];
+            const isPositive = q.isPositive || q.positive || false;
+            const stressScore = questionStressAnalysis?.enhanced?.score || questionStressAnalysis?.score || score;
+            
+            // Determine stressLevel based on AI stress score
+            let stressLevel = 'low';
+            if (stressScore >= 7) {
+              stressLevel = 'high';
+            } else if (stressScore >= 4) {
+              stressLevel = 'moderate';
+            }
+            
+            return {
+              id: q.id,
+              text: q.text,
+              selectedOption: getOptionLabel(score),
+              score: score,
+              emotion: questionStressAnalysis?.enhanced?.tag || questionStressAnalysis?.emotion || '',
+              intensity: questionStressAnalysis?.enhanced?.intensity || questionStressAnalysis?.intensity || 'Moderate',
+              stressScore: stressScore,
+              stressLevel: stressLevel,
+              answerLabel: questionStressAnalysis?.answerLabel || getOptionLabel(score),
+              domain: domains[currentDomain].name,
+              aiAnalysis: questionStressAnalysis ? {
+                score: questionStressAnalysis.enhanced?.score || questionStressAnalysis.score,
+                emotion: questionStressAnalysis.enhanced?.tag || questionStressAnalysis.emotion,
+                intensity: questionStressAnalysis.enhanced?.intensity || questionStressAnalysis.intensity,
+                enhanced: questionStressAnalysis.enhanced || null
+              } : null,
+              customReason: responses[`${q.id}_customReason`] || '',
+              tags: responses[`${q.id}_tags`] || [],
+              isPositive
+            };
+          });
+
+        // Apply filtering logic
+        const filteringResult = await filterDeepDiveQuestions(allQuestions, domains[currentDomain].name, userId);
+        const filteredQuestions = filteringResult.filteredQuestions;
+        const domainNeedsReview = filteringResult.domainNeedsReview;
+
+        // Use ManovaAgent analysis to determine deep dive trigger
+        const shouldTriggerDeepDive = allQuestions.some(q => {
+          const ai = q.aiAnalysis;
+          if (ai?.enhanced) {
+            return ai.enhanced.needsDeepDive || ai.enhanced.score >= 7;
+          }
+          if (ai) {
+            return ai.category === "High" || ai.score >= 7;
+          }
+          return false;
+        });
+        
+        const hasHighStressQuestions = shouldTriggerDeepDive;
+        
+        console.log(`🔍 Immediate DeepDive Analysis for ${domains[currentDomain].name}:`, {
+          shouldTriggerDeepDive,
+          hasHighStressQuestions,
+          highStressQuestionsCount: allQuestions.filter(q => q.stressLevel === 'high').length
+        });
+
+        if (hasHighStressQuestions) {
+          console.log(`🚀 IMMEDIATE: Triggering deep dive for ${domains[currentDomain].name}`);
+          
+          setIsLoadingDeepDive(true);
+          const domain = domains[currentDomain].name;
+          const questionsAndAnswers = domains[currentDomain].questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            answer: responses[q.id] ?? 0
+          }));
+
+          try {
+            const followup = await mcpService.generateDeepDiveFollowup(domain, questionsAndAnswers);
+            setDeepDiveDomain(domain);
+            setDeepDiveFollowup({
+              ...followup,
+              stressedQuestions: filteredQuestions,
+              domainNeedsReview: domainNeedsReview,
+              sometimesCount: filteringResult.sometimesCount,
+              totalAnswers: filteringResult.totalAnswers
+            });
+            setShowDeepDive(true);
+          } catch (e) {
+            console.error('Error generating deep dive:', e);
+            setDeepDiveDomain(domain);
+            setDeepDiveFollowup({
+              title: `Deep Dive: ${domain}`,
+              followupIntro: domainNeedsReview 
+                ? "Thanks for sharing. I noticed some patterns in your responses that suggest this area might benefit from deeper exploration. Let's take a closer look:"
+                : "Thanks for sharing. Based on your check-in, here are a few things that might be contributing to your stress. Please select all that apply:",
+              options: [],
+              textboxPrompt: 'Share anything else?',
+              rootEmotion: '',
+              urgencyLevel: 'medium',
+              suggestedTags: [],
+              stressedQuestions: filteredQuestions,
+              domainNeedsReview: domainNeedsReview,
+              sometimesCount: filteringResult.sometimesCount,
+              totalAnswers: filteringResult.totalAnswers
+            });
+            setShowDeepDive(true);
+          } finally {
+            setIsLoadingDeepDive(false);
+          }
+        } else {
+          console.log(`🎉 IMMEDIATE: No high stress questions detected in ${domains[currentDomain].name} domain`);
+          setNoStressedQuestions(true);
+          setAiMessage(`Great news! Your responses in ${domains[currentDomain].name} show you're managing this area well. No significant stress concerns were detected.`);
+          
+          // Continue to next domain immediately (no setTimeout)
+          if (currentDomain < domains.length - 1) {
+            setCurrentDomain(prev => prev + 1);
+            setCurrentQuestion(0);
+            setShowDeepDive(false);
+            setShowDomainInsight(false);
+            setNoStressedQuestions(false);
+          } else {
+            // Survey complete
+            setIsComplete(true);
+            const score = calculateWellnessScore();
+            setWellnessScore(score);
+            const emotionalAnalysis = analyzeEmotionalState();
+            setSentiment(emotionalAnalysis);
+            setAiMessage("Thank you for sharing so openly with me. I'm analyzing your responses to provide personalized insights...");
+            
+            // Prepare and submit survey data
+            const surveyData = {
+              responses: responses,
+              stressScore: score,
+              emotionSummary: emotionalAnalysis,
+              wellnessScore: score,
+              domainScores: formatResponsesForWellnessScore(),
+              stressAnalysis: stressAnalysis,
+              deepDiveSummaries: deepDiveSummaries,
+              patternAnalysis: patternAnalysisResult,
+              deepDiveTrigger: deepDiveTriggerResult
+            };
+            
+            try {
+              await handleSurveySubmit(surveyData);
+              console.log('✅ Survey completion data saved successfully');
+            } catch (error) {
+              console.error('❌ Error saving survey completion data:', error);
+            }
+          }
+        }
+      }
+    };
+
+    checkDomainCompletion();
+  }, [currentQuestion, responses, currentDomain, domains, stressAnalysis, showDeepDive, isComplete, userId]);
 
   // Animate progress bar
   useEffect(() => {
@@ -746,11 +934,16 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
     const currentQuestionText = questionObj.text;
     const isPositive = questionObj.isPositive || questionObj.positive || false;
     const answerLabel = questionObj.options.find(opt => opt.value === value)?.label || value;
+    
+    // Set response immediately
     setResponses(prev => ({
       ...prev,
       [questionId]: value
     }));
+    
+    // Start loading state
     setIsAnalyzingStress(true);
+    
     try {
       // Use enhanced stress analysis with domain context
       const analysis = await analyzeStressResponse(
@@ -819,390 +1012,23 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
         console.error('Error storing emotional vector:', vectorError);
         // Don't block the survey flow if vector storage fails
       }
+      
+      console.log('✅ Analysis completed successfully');
+      
     } catch (error) {
-      console.error('Error analyzing stress level:', error);
+      console.error('❌ Analysis failed:', error);
+      // Show error message to user
+      addToast('Analysis failed. Please try again.', 'error');
     } finally {
+      // Clear loading state
       setIsAnalyzingStress(false);
     }
-    setTimeout(async () => {
-      if (currentQuestion < domains[currentDomain].questions.length - 1) {
-        setCurrentQuestion(prev => prev + 1);
-      } else {
-        // End of domain: check if follow-up is needed
-        const avgScore = calculateDomainScore(currentDomain);
-        
-        // Wait a bit for any pending stress analysis to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Build stressedQuestions array for deep dive using AI stress analysis
-        const allQuestions = domains[currentDomain].questions
-          .map(q => {
-            const score = responses[q.id];
-            const questionStressAnalysis = stressAnalysis[q.id];
-            const isPositive = q.isPositive || q.positive || false;
-            const stressScore = questionStressAnalysis?.enhanced?.score || questionStressAnalysis?.score || score;
-            
-            // Debug logging
-            console.log(`Question ${q.id}: Survey score=${score}, AI stress score=${stressScore}, Emotion=${questionStressAnalysis?.emotion}, Intensity=${questionStressAnalysis?.intensity}`);
-            
-            // Determine stressLevel based on AI stress score
-            let stressLevel = 'low';
-            if (stressScore >= 7) {
-              stressLevel = 'high';
-            } else if (stressScore >= 4) {
-              stressLevel = 'moderate';
-            }
-            
-            return {
-              id: q.id,
-              text: q.text,
-              selectedOption: getOptionLabel(score),
-              score: score, // Original survey score
-              // Add stress analysis data with enhanced analysis priority
-              emotion: questionStressAnalysis?.enhanced?.tag || questionStressAnalysis?.emotion || '',
-              intensity: questionStressAnalysis?.enhanced?.intensity || questionStressAnalysis?.intensity || 'Moderate',
-              stressScore: stressScore, // Enhanced AI stress score
-              stressLevel: stressLevel, // NEW: stressLevel property for domain transition logic
-              answerLabel: questionStressAnalysis?.answerLabel || getOptionLabel(score),
-              // Add domain information for filtering
-              domain: domains[currentDomain].name,
-              aiAnalysis: questionStressAnalysis ? {
-                score: questionStressAnalysis.enhanced?.score || questionStressAnalysis.score,
-                emotion: questionStressAnalysis.enhanced?.tag || questionStressAnalysis.emotion,
-                intensity: questionStressAnalysis.enhanced?.intensity || questionStressAnalysis.intensity,
-                // Include enhanced analysis data
-                enhanced: questionStressAnalysis.enhanced || null
-              } : null,
-              // Optionally add customReason, tags if available in responses
-              customReason: responses[`${q.id}_customReason`] || '',
-              tags: responses[`${q.id}_tags`] || [],
-              isPositive
-            };
-          });
-
-        // Apply the enhanced filtering logic using the new stress analysis
-        const filteringResult = await filterDeepDiveQuestions(allQuestions, domains[currentDomain].name, userId);
-        const filteredQuestions = filteringResult.filteredQuestions;
-        const domainNeedsReview = filteringResult.domainNeedsReview;
-
-        // Add debug logging for deep dive trigger check
-        console.log("Deep Dive Trigger Check", {
-          domain: domains[currentDomain].name,
-          questions: allQuestions.map(q => ({
-            q: q.text,
-            score: q.stressScore || q.score,
-            stress: q.aiAnalysis?.score || 'unknown',
-            stressLevel: q.stressLevel,
-            include: q.includeInDeepDive,
-            emotion: q.emotion,
-            intensity: q.intensity,
-            aiAnalysis: q.aiAnalysis
-          }))
-        });
-
-        // Use ManovaAgent analysis to determine deep dive trigger
-        const shouldTriggerDeepDive = allQuestions.some(q => {
-          const ai = q.aiAnalysis;
-          // Check enhanced analysis first
-          if (ai?.enhanced) {
-            return ai.enhanced.needsDeepDive || ai.enhanced.score >= 7;
-          }
-          // Fallback to basic AI analysis
-          if (ai) {
-            return ai.category === "High" || ai.score >= 7;
-          }
-          return false;
-        });
-        
-        // Check if deep dive should be triggered based on ManovaAgent analysis
-        const hasHighStressQuestions = shouldTriggerDeepDive;
-        
-        console.log("🔍 Deep Dive Analysis for all domains:", {
-          domain: domains[currentDomain].name,
-          filteredQuestionsCount: filteredQuestions.length,
-          domainNeedsReview,
-          shouldTriggerDeepDive,
-          hasHighStressQuestions: hasHighStressQuestions,
-          highStressQuestionsCount: allQuestions.filter(q => q.stressLevel === 'high').length,
-          allQuestionsAnalysis: allQuestions.map(q => ({
-            text: q.text,
-            aiScore: q.aiAnalysis?.score,
-            emotion: q.emotion,
-            intensity: q.intensity,
-            answer: q.answerLabel,
-            stressLevel: q.stressLevel,
-            hasHighStress: q.stressLevel === 'high'
-          }))
-        });
-
-        // Debug logging for all domains
-        console.log("🔍 Enhanced Deep Dive Questions", filteredQuestions.map(q => ({
-          q: q.text,
-          score: q.aiAnalysis?.score,
-          stressLevel: q.stressLevel,
-          domain: q.domain,
-          userAnswer: q.selectedOption,
-          emotion: q.emotion,
-          intensity: q.intensity
-        })));
-        
-        console.log("🔍 Domain Review Status:", {
-          domain: domains[currentDomain].name,
-          needsReview: domainNeedsReview,
-          sometimesCount: filteringResult.sometimesCount,
-          totalAnswers: filteringResult.totalAnswers,
-          shouldTriggerDeepDive
-        });
-        
-        // Additional debug: show all questions and their analysis
-        const enhancedAnalysisPromises = allQuestions.map(async q => {
-          // Safety check: ensure we have a valid answer before calling comprehensiveStressAnalysis
-          const answer = q.answerLabel || q.selectedOption || 'No answer provided';
-          try {
-            const enhancedAnalysis = await comprehensiveStressAnalysis(
-              answer,
-              q.text,
-              domains[currentDomain].name.toLowerCase(),
-              undefined,
-              false,
-              userId
-            );
-            return {
-              q: q.text,
-              aiScore: q.aiAnalysis?.score,
-              enhancedScore: enhancedAnalysis.score,
-              enhancedEmotion: enhancedAnalysis.emotion,
-              enhancedIntensity: enhancedAnalysis.intensity,
-              shouldTrigger: enhancedAnalysis.shouldTriggerDeepDive,
-              domainNeedsReview: enhancedAnalysis.domainNeedsReview,
-              confidence: enhancedAnalysis.confidence,
-              reason: enhancedAnalysis.reason,
-              domain: q.domain,
-              userAnswer: q.selectedOption
-            };
-          } catch (error) {
-            console.error(`Error analyzing question: ${q.text}`, error);
-            return {
-              q: q.text,
-              aiScore: q.aiAnalysis?.score,
-              enhancedScore: 2,
-              enhancedEmotion: 'Neutral',
-              enhancedIntensity: 'Low',
-              shouldTrigger: false,
-              domainNeedsReview: false,
-              confidence: 'low',
-              reason: 'Analysis failed',
-              domain: q.domain,
-              userAnswer: q.selectedOption
-            };
-          }
-        });
-        
-        const enhancedAnalysisResults = await Promise.all(enhancedAnalysisPromises);
-        console.log("🔍 All Questions with Enhanced Analysis:", enhancedAnalysisResults);
-
-        // Ensure showDeepDive is triggered before moving to the next domain
-        if (hasHighStressQuestions) {
-          console.log(`🚀 Triggering deep dive for ${domains[currentDomain].name} - Found ${allQuestions.filter(q => q.stressLevel === 'high').length} high stress questions`);
-          
-          // Prepare data for GPT-4
-          setIsLoadingDeepDive(true);
-          const domain = domains[currentDomain].name;
-          const questionsAndAnswers = domains[currentDomain].questions.map(q => ({
-            id: q.id,
-            text: q.text,
-            answer: responses[q.id] ?? 0
-          }));
-
-          try {
-            const followup = await mcpService.generateDeepDiveFollowup(domain, questionsAndAnswers);
-            setDeepDiveDomain(domain);
-            setDeepDiveFollowup(followup);
-            setShowDeepDive(true);
-            // Pass flaggedQuestions as state for DeepDiveFollowup
-            setDeepDiveFollowup(prev => ({ 
-              ...prev, 
-              stressedQuestions: filteredQuestions, // These are the flagged questions
-              domainNeedsReview: domainNeedsReview,
-              sometimesCount: filteringResult.sometimesCount,
-              totalAnswers: filteringResult.totalAnswers
-            }));
-          } catch (e) {
-            console.error('Error generating deep dive:', e);
-            setDeepDiveDomain(domain);
-            setDeepDiveFollowup({
-              title: `Deep Dive: ${domain}`,
-              followupIntro: domainNeedsReview 
-                ? "Thanks for sharing. I noticed some patterns in your responses that suggest this area might benefit from deeper exploration. Let's take a closer look:"
-                : "Thanks for sharing. Based on your check-in, here are a few things that might be contributing to your stress. Please select all that apply:",
-              options: [],
-              textboxPrompt: 'Share anything else?',
-              rootEmotion: '',
-              urgencyLevel: 'medium',
-              suggestedTags: [],
-              stressedQuestions: filteredQuestions, // These are the flagged questions
-              domainNeedsReview: domainNeedsReview,
-              sometimesCount: filteringResult.sometimesCount,
-              totalAnswers: filteringResult.totalAnswers
-            });
-            setShowDeepDive(true);
-          } finally {
-            setIsLoadingDeepDive(false);
-          }
-        } else {
-          // No high-stress questions found - show positive message and continue to next domain
-          console.log(`🎉 No high stress questions (stressLevel === 'high') detected in ${domains[currentDomain].name} domain`);
-          setNoStressedQuestions(true);
-          setAiMessage(`Great news! Your responses in ${domains[currentDomain].name} show you're managing this area well. No significant stress concerns were detected.`);
-          
-          // Wait a moment to show the positive message, then continue to next domain
-          setTimeout(async () => {
-            setNoStressedQuestions(false);
-            // Always proceed to next domain regardless of stress analysis
-            if (currentDomain < domains.length - 1) {
-              setCurrentDomain(prev => prev + 1);
-              setCurrentQuestion(0);
-              setShowDeepDive(false);
-              setShowDomainInsight(false);
-              setNoStressedQuestions(false);
-            } else {
-              // Survey complete - process enhanced analysis
-              setIsComplete(true);
-              const score = calculateWellnessScore();
-              setWellnessScore(score);
-              const emotionalAnalysis = analyzeEmotionalState();
-              setSentiment(emotionalAnalysis);
-              setAiMessage("Thank you for sharing so openly with me. I'm analyzing your responses to provide personalized insights...");
-              
-              // Prepare survey data for final submission
-              const surveyData = {
-                responses: responses,
-                stressScore: score,
-                emotionSummary: emotionalAnalysis,
-                wellnessScore: score,
-                domainScores: formatResponsesForWellnessScore(),
-                stressAnalysis: stressAnalysis,
-                deepDiveSummaries: deepDiveSummaries,
-                patternAnalysis: patternAnalysisResult,
-                deepDiveTrigger: deepDiveTriggerResult
-              };
-              
-              // Submit final survey data
-              try {
-                await handleSurveySubmit(surveyData);
-                console.log('✅ Survey completion data saved successfully');
-              } catch (error) {
-                console.error('❌ Error saving survey completion data:', error);
-                // Don't block the UI flow if save fails
-              }
-              
-              // Process enhanced stress analysis batch and save to Firestore
-              try {
-                const allResponses = [];
-                domains.forEach(domain => {
-                  domain.questions.forEach(question => {
-                    const response = responses[question.id];
-                    if (response !== undefined) {
-                      const answerLabel = question.options?.find(opt => opt.value === response)?.label || response;
-                      allResponses.push({
-                        question: question.text,
-                        answer: answerLabel,
-                        domain: domain.name,
-                        questionId: question.id
-                      });
-                    }
-                  });
-                });
-                
-                // Process batch analysis and save to Firestore
-                if (allResponses.length > 0) {
-                  enhancedAnalysisIntegration(allResponses, userId)
-                    .then(result => {
-                      if (result.success) {
-                        console.log('✅ Enhanced stress analysis saved successfully:', result.summary);
-                      } else {
-                        console.warn('⚠️ Enhanced stress analysis save failed:', result.error);
-                      }
-                    })
-                    .catch(error => {
-                      console.error('❌ Error saving enhanced stress analysis:', error);
-                    });
-                }
-                
-                // 🧠 Layer 1 AI: Emotional Pattern Analysis
-                try {
-                  console.log('🧠 Starting Layer 1 emotional pattern analysis...');
-                  
-                  // Prepare current responses with stress analysis data
-                  const currentResponsesForAnalysis = allResponses.map(response => {
-                    const questionStressAnalysis = Object.values(stressAnalysis).find(
-                      analysis => analysis.questionText === response.question
-                    );
-                    
-                    return {
-                      ...response,
-                      stressScore: questionStressAnalysis?.enhanced?.score || questionStressAnalysis?.score || 0,
-                      aiAnalysis: questionStressAnalysis ? {
-                        score: questionStressAnalysis.enhanced?.score || questionStressAnalysis.score,
-                        enhanced: questionStressAnalysis.enhanced,
-                        emotion: questionStressAnalysis.enhanced?.tag || questionStressAnalysis.emotion,
-                        intensity: questionStressAnalysis.enhanced?.intensity || questionStressAnalysis.intensity,
-                        causeTag: questionStressAnalysis.enhanced?.causeTag
-                      } : null
-                    };
-                  });
-                  
-                  // Perform emotional pattern analysis
-                  const patternAnalysis = await analyzeEmotionalPatterns(userId, currentResponsesForAnalysis);
-                  
-                  // Generate deep dive trigger based on patterns
-                  const deepDiveTrigger = generateDeepDiveTrigger(patternAnalysis);
-                  
-                  console.log('🎯 Pattern-based deep dive analysis:', {
-                    shouldTrigger: deepDiveTrigger.shouldTrigger,
-                    reason: deepDiveTrigger.reason,
-                    recommendTherapist: deepDiveTrigger.recommendTherapist,
-                    focusDomains: deepDiveTrigger.focusDomains
-                  });
-                  
-                  // Store pattern analysis results in state for UI display
-                  setPatternAnalysisResult(patternAnalysis);
-                  setDeepDiveTriggerResult(deepDiveTrigger);
-                  
-                  // Trigger therapist recommendation if needed
-                  if (deepDiveTrigger.recommendTherapist) {
-                    console.log('🏥 Therapist recommendation triggered due to recurring patterns');
-                    setShowTherapistRecommendation(true);
-                    setAiMessage(`
-                      I've noticed some recurring stress patterns in your responses that suggest you might benefit from speaking with a mental health professional. 
-                      This is completely normal and shows self-awareness. Consider scheduling a consultation to discuss these patterns further.
-                    `);
-                  } else if (deepDiveTrigger.shouldTrigger) {
-                    setAiMessage(`
-                      I've identified some patterns in your responses that suggest certain areas may need attention. 
-                      Let's explore these patterns further to help you develop better coping strategies.
-                    `);
-                  }
-                  
-                  // Perform vector cleanup for storage optimization
-                  await performVectorCleanup(userId, 50);
-                  
-                } catch (patternError) {
-                  console.error('❌ Error in emotional pattern analysis:', patternError);
-                  // Don't block the survey completion if pattern analysis fails
-                }
-              } catch (error) {
-                console.error('❌ Error processing enhanced analysis batch:', error);
-              }
-              
-              setTimeout(() => {
-                setShowResults(true);
-              }, 2000);
-            }
-          }, 3000);
-        }
-      }
-    }, 500);
+    
+    // Move to next question only after analysis is complete
+    if (currentQuestion < domains[currentDomain].questions.length - 1) {
+      setCurrentQuestion(prev => prev + 1);
+    }
+    // Domain completion is now handled by the useEffect hook above
   };
 
   const calculateDomainScore = (domainIndex) => {
@@ -2036,7 +1862,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
     const wellnessScoreData = formatResponsesForWellnessScore();
     
     const handleViewDashboard = () => {
-      window.location.href = '/dashboard';
+      navigate('/dashboard', { state: { fromCheckin: true } });
     };
 
     const handleTakeSurveyAgain = () => {
@@ -2044,7 +1870,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
     };
     
     return (
-      <div className="min-h-screen bg-white pt-20 pb-8 px-4">
+      <div className="min-h-screen bg-white pb-8 px-4">
         <WellnessSummary 
           domainScores={wellnessScoreData}
           overallScore={wellnessScore}
@@ -2059,7 +1885,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
 
   if (isComplete) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center pt-20 pb-8 px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center pb-8 px-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl w-full text-center">
           <div className="animate-pulse mb-6">
             <Brain className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
@@ -2158,7 +1984,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
   // Safety check to ensure domains array is properly initialized
   if (!domains || domains.length === 0 || currentDomain >= domains.length) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center pt-20 pb-8 px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center pb-8 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading survey...</p>
@@ -2173,7 +1999,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
   // Safety check for current question
   if (!currentQ) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center pt-20 pb-8 px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center pb-8 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading question...</p>
@@ -2191,7 +2017,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
   if (userContext?.historyDepth === 1) {
     personalizationMessage = "Welcome! Let's start building your wellness journey.";
   } else if (userContext?.historyDepth < 4) {
-    personalizationMessage = "We're starting to see some patterns in your responses.";
+    personalizationMessage = "Building your personalized wellness profile with each response.";
   } else {
     personalizationMessage = "You have a rich history with us. Your questions are now highly personalized!";
   }
@@ -2276,7 +2102,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
     currentDomainInsight.stressLevel.toLowerCase() === "low"
   ) {
     return (
-      <div className="min-h-screen bg-white pt-16 pb-6 px-4">
+      <div className="min-h-screen bg-white pb-6 px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Domain Complete</h1>
@@ -2320,19 +2146,16 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
 
   return (
     <>
-      <div className="min-h-screen bg-white overflow-x-hidden px-4 sm:px-6 lg:px-16 pt-12">
+      <div className="min-h-screen bg-white overflow-x-hidden px-4 sm:px-6 lg:px-16">
         <div className="grid grid-cols-12 gap-8 max-w-screen-xl mx-auto">
           <div className="col-span-12 mb-6">
         {/* Enhanced Header */}
             <div className="text-center">
-          <div className="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-2 mb-4">
+          <div className="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-2 mb-8">
             <Clock className="w-4 h-4 text-blue-600" />
             <span className="text-sm font-medium text-blue-700">Wellness Assessment</span>
-            <Badge variant="secondary" className="ml-2">
-              ~10 minutes
-            </Badge>
                     </div>
-              <h1 className="text-2xl lg:text-3xl font-semibold text-gray-900 mb-3">
+              <h1 className="text-2xl lg:text-3xl font-semibold text-gray-900 mb-4">
             How are you feeling today?
                       </h1>
               <p className="text-base text-gray-600 max-w-2xl mx-auto">
@@ -2392,7 +2215,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
 
           <div className="col-span-12 lg:col-span-8">
           {/* Main Survey Card */}
-            <Card className={`shadow-lg border-0 transition-all duration-300 ${
+            <Card className={`shadow-sm border border-gray-100 transition-all duration-300 ${
               showQuestionTransition ? 'ring-2 ring-blue-200 shadow-xl' : ''
             }`}>
               <CardHeader className="pb-4">
@@ -2402,7 +2225,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                                          <CardTitle className="text-xl text-gray-900">
+                                          <CardTitle className="text-xl font-semibold text-gray-900">
                       {domains[currentDomain]?.name || 'Domain'}
                     </CardTitle>
                       <Tooltip>
@@ -2420,7 +2243,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
               </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 {/* AI Insight Message */}
                 {aiMessage && (
                   <motion.div
@@ -2428,11 +2251,11 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                     animate={{ opacity: 1, y: 0 }}
                     exit={false}
                     transition={{ duration: 0.15 }}
-                    className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100"
+                    className="p-3 bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 rounded-lg border border-blue-100 shadow-sm"
                   >
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                        <Brain className="w-3 h-3 text-white" />
+                      <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                        <Brain className="w-3 h-3 text-blue-600" />
                       </div>
                       <p className="text-sm text-blue-800 leading-relaxed">
                         {aiMessage}
@@ -2464,17 +2287,22 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100"
+                    className="p-4 bg-gradient-to-r from-purple-50 via-pink-50 to-indigo-50 rounded-xl border border-purple-100 shadow-sm"
                   >
-                    <p className="text-sm text-purple-800 leading-relaxed">
-                      {personalizationMessage}
-                    </p>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-5 h-5 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Brain className="w-3 h-3 text-purple-600" />
+                      </div>
+                      <p className="text-sm text-purple-800 leading-relaxed">
+                        {personalizationMessage}
+                      </p>
+                    </div>
                   </motion.div>
                 )}
 
                 {/* Question */}
                 <div>
-                  <h2 className="text-lg lg:text-xl text-gray-900 mb-2 leading-relaxed">
+                  <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-4 leading-relaxed">
                     {currentQ?.text}
                   </h2>
                   {currentQ?.subtitle && (
@@ -2484,7 +2312,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                   )}
                   
                   {/* Enhanced Answer Options */}
-                  <div className="space-y-3">
+                  <div className="bg-white p-6 rounded-xl space-y-3">
                     {currentQ?.options.map((option, index) => (
                       <Tooltip key={index}>
                         <TooltipTrigger asChild>
@@ -2492,9 +2320,14 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                             onClick={() => handleResponse(option.value)}
                             onMouseEnter={() => setHoveredOption(index)}
                             onMouseLeave={() => setHoveredOption(null)}
+                            disabled={isAnalyzingStress}
                             className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 transform hover:-translate-y-0.5 hover:shadow-md ${
-                              responses[currentQ.id] === option.value
-                                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 text-blue-900 shadow-md scale-[1.02]'
+                              isAnalyzingStress
+                                ? responses[domains[currentDomain]?.questions[currentQuestion]?.id] === option.value
+                                  ? 'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-300 text-blue-700 cursor-not-allowed opacity-80'
+                                  : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                                : responses[domains[currentDomain]?.questions[currentQuestion]?.id] === option.value
+                                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 text-blue-900 shadow-lg ring-2 ring-blue-200 ring-opacity-50 scale-[1.02]'
                                 : hoveredOption === index
                                 ? 'bg-gradient-to-r from-gray-50 to-blue-50 border-blue-200 text-gray-700 shadow-sm'
                                 : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
@@ -2502,22 +2335,26 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <span className="font-medium">{option.label}</span>
-                                {(hoveredOption === index || responses[currentQ.id] === option.value) && option.description && (
+                                <span className="font-semibold">{option.label}</span>
+                                {(hoveredOption === index || responses[domains[currentDomain]?.questions[currentQuestion]?.id] === option.value) && option.description && (
                                   <div className="text-xs text-gray-600 mt-1 transition-all duration-200">
                                     {option.description}
                                   </div>
                                 )}
                               </div>
                               <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                                responses[currentQ.id] === option.value
+                                responses[domains[currentDomain]?.questions[currentQuestion]?.id] === option.value
                                   ? 'bg-blue-600 border-blue-600 scale-110'
                                   : hoveredOption === index
                                   ? 'border-blue-400 scale-105'
                                   : 'border-gray-300'
                               }`}>
-                                {responses[currentQ.id] === option.value && (
-                                  <CheckCircle className="w-4 h-4 text-white" />
+                                {responses[domains[currentDomain]?.questions[currentQuestion]?.id] === option.value && (
+                                  isAnalyzingStress ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  ) : (
+                                    <CheckCircle className="w-4 h-4 text-white" />
+                                  )
                                 )}
                               </div>
                             </div>
@@ -2589,14 +2426,14 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                       )}
 
                       {/* Loading Stress Analysis */}
-                {isAnalyzingStress && responses[currentQ?.id] !== undefined && (
+                {isAnalyzingStress && responses[domains[currentDomain]?.questions[currentQuestion]?.id] !== undefined && (
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                    className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center space-x-3"
+                    className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 flex items-center space-x-3"
                         >
-                          <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm text-gray-600">
+                          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-blue-700 font-medium">
                             Analyzing your response...
                           </span>
                         </motion.div>
@@ -2607,33 +2444,46 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                   <Button
                     onClick={handleBack}
                     variant="outline"
-                    disabled={currentQuestion === 0 && currentDomain === 0}
-                    className="flex items-center space-x-2 hover:bg-gray-50 transition-all duration-200"
+                    disabled={(currentQuestion === 0 && currentDomain === 0) || isAnalyzingStress}
+                    className={`flex items-center space-x-2 transition-all duration-200 ${
+                      isAnalyzingStress 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
                     <ChevronLeft className="w-4 h-4" />
                     <span>Previous</span>
                   </Button>
                   
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <span>Press Enter to continue</span>
+                    <span>
+                      {isAnalyzingStress 
+                        ? 'Analyzing your response...' 
+                        : responses[domains[currentDomain]?.questions[currentQuestion]?.id] !== undefined 
+                        ? 'Press Enter to continue' 
+                        : 'Select an option to continue'
+                      }
+                    </span>
                   </div>
                   
                   <Button
                     onClick={handleNext}
-                    disabled={responses[currentQ?.id] === undefined}
-                    className={`flex items-center space-x-2 transition-all duration-200 transform hover:scale-105 ${
-                      responses[currentQ?.id] !== undefined 
-                        ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl' 
-                        : ''
+                    disabled={responses[domains[currentDomain]?.questions[currentQuestion]?.id] === undefined || isAnalyzingStress}
+                    className={`flex items-center space-x-2 transition-all duration-200 text-white ${
+                      responses[domains[currentDomain]?.questions[currentQuestion]?.id] !== undefined && !isAnalyzingStress
+                        ? 'bg-[#2563eb] hover:bg-[#1d4ed8] shadow-lg hover:shadow-xl' 
+                        : 'bg-gray-400 cursor-not-allowed'
                     }`}
                   >
                     <span>
-                      {currentDomain === domains.length - 1 && currentQuestion === domains[currentDomain].questions.length - 1
+                      {isAnalyzingStress 
+                        ? 'Analyzing...'
+                        : currentDomain === domains.length - 1 && currentQuestion === domains[currentDomain].questions.length - 1
                         ? 'Complete Assessment'
                         : 'Next Question'
                       }
                     </span>
-                    <ChevronRight className="w-4 h-4" />
+                    {!isAnalyzingStress && <ChevronRight className="w-4 h-4" />}
                   </Button>
                 </div>
 
@@ -2651,16 +2501,16 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
 
           <div className="col-span-12 lg:col-span-4">
             {/* Assessment Progress Block */}
-            <div className="space-y-4">
+            <div className="space-y-3">
             {/* Domain Progress */}
               <Card className="shadow-md border-0">
-              <CardHeader>
-                <CardTitle className="text-lg text-gray-900 flex items-center">
-                  <Target className="w-5 h-5 mr-2 text-blue-600" />
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center">
+                  <Target className="w-4 h-4 mr-2 text-blue-600" />
                   Assessment Progress
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2 pt-0">
                 {domains.map((domain, index) => {
                   const DomainIcon = domain.icon;
                   const isActive = index === currentDomain;
@@ -2670,7 +2520,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                   return (
                     <div
                       key={index}
-                      className={`p-3 rounded-lg border transition-all duration-300 hover:shadow-sm ${
+                      className={`p-2 rounded-lg border transition-all duration-300 hover:shadow-sm ${
                         isActive 
                           ? `border-2 ${getColorClasses(domain.color, 'light')} shadow-sm` 
                           : isComplete 
@@ -2678,8 +2528,8 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                           : 'border-gray-200 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all duration-200 ${
                           isActive 
                             ? getColorClasses(domain.color)
                             : isComplete 
@@ -2687,13 +2537,13 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                             : 'bg-gray-200 text-gray-500'
                         }`}>
                           {isComplete ? (
-                            <CheckCircle className="w-4 h-4" />
+                            <CheckCircle className="w-3 h-3" />
                           ) : (
-                            <DomainIcon className="w-4 h-4" />
+                            <DomainIcon className="w-3 h-3" />
                           )}
                         </div>
                         <div className="flex-1">
-                          <div className={`text-sm font-medium ${
+                          <div className={`text-xs font-medium ${
                             isActive 
                               ? domain.color === 'blue' ? 'text-blue-700' :
                                 domain.color === 'rose' ? 'text-rose-700' :
@@ -2711,7 +2561,7 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                           </div>
                         </div>
                         {isActive && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
                         )}
                       </div>
                     </div>
@@ -2722,16 +2572,16 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
 
             {/* Quick Stats */}
               <Card className="shadow-md border-0">
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <div className="text-lg font-semibold text-blue-600">
+              <CardContent className="p-3">
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="text-base font-semibold text-blue-600">
                       {Object.keys(responses).length}
                   </div>
                     <div className="text-xs text-blue-700">Completed</div>
                   </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <div className="text-lg font-semibold text-gray-600">
+                  <div className="p-2 bg-gray-50 rounded-lg">
+                    <div className="text-base font-semibold text-gray-600">
                       {totalQuestions - Object.keys(responses).length}
                 </div>
                     <div className="text-xs text-gray-700">Remaining</div>

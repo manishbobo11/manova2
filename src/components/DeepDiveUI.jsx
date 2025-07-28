@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 
 // Custom styles for react-select
@@ -55,16 +55,70 @@ const selectStyles = {
   })
 };
 
+// Shimmer loading component
+const ShimmerLoader = () => (
+  <div className="w-full bg-white/90 rounded-2xl shadow-lg p-4 sm:p-6 flex flex-col gap-4 animate-pulse">
+    {/* Shimmer for the select control */}
+    <div className="w-full h-12 bg-gray-200 rounded-2xl"></div>
+    {/* Shimmer for the selection counter */}
+    <div className="p-3 bg-gray-100 rounded-xl">
+      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+    </div>
+  </div>
+);
+
 const DeepDiveUI = ({ 
   stressOptions = [], 
   selectedStressTags = [], 
   onStressTagsChange, 
   maxSelections = 3,
   placeholder = "Choose stress contributors...",
-  className = ""
+  className = "",
+  questionId = null, // Add questionId prop for API calls
+  isLoading = false // Add isLoading prop for external loading states
 }) => {
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchOptions() {
+      setLoading(true);
+      try {
+        // Try to fetch dynamic contributors from API based on question ID
+        if (questionId) {
+          console.log(`🔍 Fetching dynamic contributors for question: ${questionId}`);
+          const res = await fetch(`http://localhost:8001/api/contributors?qid=${questionId}`);
+          if (res.ok) {
+            const data = await res.json();
+            console.log(`✅ Received ${data.length} dynamic contributors for ${questionId}`);
+            setOptions(data);
+          } else {
+            console.log(`⚠️ API returned ${res.status}, falling back to provided options`);
+            setOptions(stressOptions);
+          }
+        } else {
+          // Use provided stressOptions if no questionId
+          console.log('📋 Using provided stress options (no question ID)');
+          setOptions(stressOptions);
+        }
+      } catch (e) {
+        console.error('❌ Error loading contributors:', e);
+        console.log('🔄 Falling back to provided stress options');
+        setOptions(stressOptions);
+      }
+      setLoading(false);
+    }
+    
+    fetchOptions();
+  }, [questionId, stressOptions]);
+
+  // Show shimmer loader while loading (either API loading or external loading)
+  if (loading || isLoading) {
+    return <ShimmerLoader />;
+  }
+
   // Convert stressOptions to react-select format if they're strings
-  const selectOptions = stressOptions.map((opt, index) => {
+  const selectOptions = options.map((opt, index) => {
     if (typeof opt === 'string') {
       return { 
         label: opt, 
@@ -102,12 +156,12 @@ const DeepDiveUI = ({
   };
 
   return (
-    <div className={`w-full max-w-2xl mx-auto bg-white/90 rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 flex flex-col gap-4 scale-[1.05] ${className}`}>
+    <div className={`w-full bg-white/90 rounded-2xl shadow-lg p-4 sm:p-6 flex flex-col gap-4 ${className}`}>
       <Select
         options={selectOptions}
         value={selectedOptions}
         isMulti
-        maxMenuHeight={200}
+        maxMenuHeight={300}
         placeholder={placeholder}
         onChange={handleChange}
         isOptionDisabled={(option) => {

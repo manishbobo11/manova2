@@ -3,7 +3,7 @@
  * Manages current chat session state and persistence
  */
 
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { chatPersistence } from '../services/firebase/chatPersistence';
 import { ChatEngine } from '../services/ai/ChatEngine';
 import { generateMessageId } from '../utils/messageId';
@@ -15,6 +15,7 @@ const ACTIONS = {
   SET_SESSION: 'SET_SESSION',
   SET_MESSAGES: 'SET_MESSAGES',
   ADD_MESSAGE: 'ADD_MESSAGE',
+  MARK_MESSAGE_SAVED: 'MARK_MESSAGE_SAVED',
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
   SET_LANGUAGE: 'SET_LANGUAGE',
@@ -77,6 +78,15 @@ function chatSessionReducer(state, action) {
       };
     }
 
+    case ACTIONS.MARK_MESSAGE_SAVED: {
+      return {
+        ...state,
+        messages: state.messages.map(msg => 
+          msg.id === action.payload.messageId ? { ...msg, saved: true } : msg
+        )
+      };
+    }
+
     case ACTIONS.SET_LOADING:
       return {
         ...state,
@@ -136,6 +146,29 @@ export const ChatSessionProvider = ({ children, userId }) => {
     chatEngine: new ChatEngine()
   });
 
+  // Save message to Firestore with retry logic
+  const saveMessageToFirestore = useCallback(async (message) => {
+    try {
+      const result = await chatPersistence.saveMessage(
+        userId, 
+        state.currentSessionId, 
+        message
+      );
+
+      if (result.success) {
+        // Mark message as saved - this won't trigger the messages useEffect
+        dispatch({
+          type: ACTIONS.MARK_MESSAGE_SAVED,
+          payload: { messageId: message.id }
+        });
+      } else {
+        console.error('Failed to save message:', result.error);
+      }
+    } catch (error) {
+      console.error('Error in saveMessageToFirestore:', error);
+    }
+  }, [userId, state.currentSessionId]);
+
   // Auto-save messages to Firestore when messages change
   useEffect(() => {
     if (state.currentSessionId && state.messages.length > 0) {
@@ -146,7 +179,7 @@ export const ChatSessionProvider = ({ children, userId }) => {
         saveMessageToFirestore(lastMessage);
       }
     }
-  }, [state.messages, state.currentSessionId]);
+  }, [state.messages, state.currentSessionId, saveMessageToFirestore]);
 
   // Cleanup effect to prevent memory leaks
   useEffect(() => {
@@ -158,33 +191,8 @@ export const ChatSessionProvider = ({ children, userId }) => {
     };
   }, [state.currentSessionId]);
 
-  // Save message to Firestore with retry logic
-  const saveMessageToFirestore = async (message) => {
-    try {
-      const result = await chatPersistence.saveMessage(
-        userId, 
-        state.currentSessionId, 
-        message
-      );
-
-      if (result.success) {
-        // Mark message as saved
-        dispatch({
-          type: ACTIONS.SET_MESSAGES,
-          payload: state.messages.map(msg => 
-            msg.id === message.id ? { ...msg, saved: true } : msg
-          )
-        });
-      } else {
-        console.error('Failed to save message:', result.error);
-      }
-    } catch (error) {
-      console.error('Error in saveMessageToFirestore:', error);
-    }
-  };
-
   // Create new chat session
-  const createNewSession = async (language = 'English', skipIntro = false) => {
+  const createNewSession = useCallback(async (language = 'English', skipIntro = false) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
       dispatch({ type: ACTIONS.SET_ERROR, payload: null });
@@ -275,10 +283,10 @@ export const ChatSessionProvider = ({ children, userId }) => {
     } finally {
       dispatch({ type: ACTIONS.SET_LOADING, payload: false });
     }
-  };
+  }, [userId, state.language]);
 
   // Load existing session
-  const loadSession = async (sessionId = null) => {
+  const loadSession = useCallback(async (sessionId = null) => {
     try {
       dispatch({ type: ACTIONS.SET_LOADING, payload: true });
       dispatch({ type: ACTIONS.SET_ERROR, payload: null });
@@ -328,7 +336,7 @@ export const ChatSessionProvider = ({ children, userId }) => {
     } finally {
       dispatch({ type: ACTIONS.SET_LOADING, payload: false });
     }
-  };
+  }, [userId, state.language, createNewSession]);
 
   // Send message
   const sendMessage = async (messageText) => {

@@ -27,7 +27,7 @@ const AnimatedHeroSection = () => {
   ];
 
   return (
-    <div className="hidden lg:block absolute left-[740px] top-[149px] w-[580px] h-[593px]">
+    <div className="hidden lg:block absolute left-[640px] top-[80px] w-[680px] h-[680px]">
       <div className="relative w-full h-full flex items-center justify-center">
         {/* Background gradient circle */}
         <motion.div
@@ -39,25 +39,25 @@ const AnimatedHeroSection = () => {
 
         {/* Floating decorative dots */}
         <motion.div
-          className="absolute top-16 left-12 w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full shadow-lg opacity-70"
+          className="absolute top-20 left-16 w-4 h-4 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full shadow-lg opacity-70"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.7 }}
           transition={{ duration: 0.8, delay: 0.3 }}
         />
         <motion.div
-          className="absolute top-24 right-14 w-2 h-2 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full shadow-lg opacity-60"
+          className="absolute top-32 right-20 w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full shadow-lg opacity-60"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.6 }}
           transition={{ duration: 0.8, delay: 0.5 }}
         />
         <motion.div
-          className="absolute bottom-24 left-16 w-4 h-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-full shadow-lg opacity-80"
+          className="absolute bottom-32 left-20 w-5 h-5 bg-gradient-to-r from-green-400 to-blue-500 rounded-full shadow-lg opacity-80"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.8 }}
           transition={{ duration: 0.8, delay: 0.7 }}
         />
         <motion.div
-          className="absolute bottom-20 right-12 w-3 h-3 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full shadow-lg opacity-70"
+          className="absolute bottom-24 right-16 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full shadow-lg opacity-70"
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 0.7 }}
           transition={{ duration: 0.8, delay: 0.9 }}
@@ -70,7 +70,7 @@ const AnimatedHeroSection = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.6, ease: "easeInOut" }}
         >
-          <div className="bg-white rounded-3xl p-4 md:p-6 shadow-[0_0_30px_rgba(173,216,230,0.3)] w-40 sm:w-56 md:w-64 flex items-center justify-center">
+          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-[0_0_40px_rgba(173,216,230,0.4)] w-48 sm:w-64 md:w-80 flex items-center justify-center">
             <img
               src="/logo/manova-logo.png"
               alt="Manova"
@@ -83,7 +83,7 @@ const AnimatedHeroSection = () => {
         {featureTags.map((tag, index) => (
           <motion.div
             key={tag.text}
-            className={`absolute px-4 py-2 rounded-full bg-gradient-to-r ${tag.color} text-white text-sm font-semibold shadow-lg backdrop-blur-sm`}
+            className={`absolute px-5 py-3 rounded-full bg-gradient-to-r ${tag.color} text-white text-base font-semibold shadow-lg backdrop-blur-sm`}
             style={{
               top: `${20 + index * 15}%`,
               left: index % 2 === 0 ? "10%" : "70%",
@@ -145,37 +145,34 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen w-full bg-white overflow-hidden">
-      {/* Navigation Header - Now handled by unified Navbar component */}
-
       {/* Main Content Section */}
-      <div className="w-full max-w-[1440px] mx-auto relative bg-white min-h-[calc(100vh-67px)]">
+      <div className="w-full max-w-screen-xl mx-auto relative bg-white min-h-[calc(100vh-67px)] px-2 md:px-4 py-4 pt-12">
         {/* Animated Hero Section */}
         <AnimatedHeroSection />
 
         {/* Left Side Content */}
-        <div className="lg:absolute lg:left-[138px] lg:top-[217px] lg:w-[580px] lg:h-[457px] w-full max-w-2xl mx-auto lg:mx-0 px-4 lg:px-0 py-8 lg:py-0">
-          <div className="flex flex-col items-start gap-[25px] h-full">
+        <div className="lg:absolute lg:left-[60px] lg:top-[140px] lg:w-[580px] lg:h-[480px] w-full max-w-2xl mx-auto lg:mx-0 px-2 lg:px-0 py-2 lg:py-0">
+          <div className="flex flex-col items-center lg:items-start gap-3 h-full text-center lg:text-left">
             {/* Title and Description Section */}
-            <div className="flex flex-col items-start gap-[36px] w-full">
+            <div className="flex flex-col items-center lg:items-start gap-4 w-full">
               {/* Main Headline */}
-              <h1 className="text-[48px] font-bold font-inter leading-normal">
+              <h1 className="text-[56px] font-bold font-inter leading-tight text-balance mb-4">
                 <span className="text-black">Your AI-Powered </span>
                 <span className="text-[#007CFF]">Mental Health</span>
                 <span className="text-black"> Companion</span>
               </h1>
 
               {/* Description */}
-              <p className="text-[20px] font-normal font-inter text-black leading-[32px] w-full">
-                Transform your mental wellness journey with AI that Understand ,
-                adapts and grows with you available 24/7 with complete privacy.
+              <p className="text-[22px] font-normal font-inter text-black leading-[36px] w-full max-w-2xl mt-2 text-balance">
+                Transform your mental wellness journey with AI that understands, adapts and grows with you available 24/7 with complete privacy.
               </p>
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col lg:flex-row gap-[10px] lg:gap-[16px] w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
               <motion.button
                 onClick={() => navigate("/signup")}
-                className="flex py-[16px] px-[24px] justify-center items-center gap-[10px] rounded-[24px] bg-[#007CFF] hover:bg-[#0066CC] transition-colors shadow-[0px_1px_18px_0px_rgba(0,0,0,0.40)]"
+                className="flex py-[16px] px-[24px] justify-center items-center gap-[10px] rounded-[24px] bg-[#007CFF] hover:bg-[#0066CC] transition-colors shadow-[0px_1px_18px_0px_rgba(0,0,0,0.40)] w-full sm:w-auto"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -186,7 +183,7 @@ const LandingPage = () => {
 
               <motion.button
                 onClick={() => navigate("/community")}
-                className="flex py-[16px] px-[24px] justify-center items-center gap-[10px] rounded-[24px] border border-[#007CFF] bg-white hover:bg-gray-50 transition-colors shadow-[0px_1px_12px_0px_rgba(0,0,0,0.40)]"
+                className="flex py-[16px] px-[24px] justify-center items-center gap-[10px] rounded-[24px] border border-[#007CFF] bg-white hover:bg-gray-50 transition-colors shadow-[0px_1px_12px_0px_rgba(0,0,0,0.40)] w-full sm:w-auto"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -200,7 +197,7 @@ const LandingPage = () => {
       </div>
 
       {/* Feeling Stuck Section */}
-      <section className="w-full bg-white py-16 lg:py-24">
+      <section className="w-full bg-white py-4 lg:py-6">
         <div className="w-full max-w-[1440px] mx-auto relative px-4">
           {/* Main Title */}
           <motion.div
@@ -221,7 +218,7 @@ const LandingPage = () => {
           </motion.div>
 
           {/* Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mt-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mt-4">
             {/* Left Side - Illustration */}
             <motion.div
               className="flex justify-center lg:justify-start"
@@ -864,6 +861,798 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Real Conversations, Real Support Section */}
+      <section className="w-full bg-white py-16 lg:py-24">
+        <div className="w-full max-w-[1440px] mx-auto relative px-4">
+          {/* Title and Description */}
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-[48px] font-bold font-inter leading-normal mb-8">
+              <span className="text-black">Real Conversations, </span>
+              <span className="text-[#007CFF]">Real Support</span>
+            </h2>
+            <p className="text-[20px] font-normal font-inter text-black leading-[32px] max-w-[1200px] mx-auto text-center">
+              Meet Sarthi Manova's real-time AI assistant offers gentle,
+              empathetic conversations right when you need them. Whether you're
+              overwhelmed or just need a check-in, we're here to listen.
+            </p>
+          </motion.div>
+
+          {/* Chat Interface Mockup */}
+          <motion.div
+            className="flex justify-center"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            viewport={{ once: true }}
+          >
+            <div className="relative">
+              {/* Phone Frame */}
+              <div
+                className="w-[283px] h-[612px] relative"
+                style={{
+                  filter: "drop-shadow(0px 10px 40px rgba(0, 0, 0, 0.25))",
+                }}
+              >
+                {/* Device Frame */}
+                <div className="w-[283px] h-[612px] rounded-[18px] border-[8px] border-[#CAC4D0] bg-white relative overflow-hidden">
+                  {/* Status Bar */}
+                  <div className="flex w-full h-[52px] px-6 py-[10px] justify-between items-end">
+                    <span className="text-[14px] font-medium text-[#1D1B20] font-roboto">
+                      9:30
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {/* Signal/Battery indicators */}
+                      <div className="w-[24px] h-[12px] bg-[#1D1B20] opacity-30 rounded-sm"></div>
+                      <div className="w-[24px] h-[12px] bg-[#1D1B20] rounded-sm"></div>
+                    </div>
+                  </div>
+
+                  {/* Chat Content */}
+                  <div className="w-full h-[542px] bg-white relative">
+                    {/* Chat Header */}
+                    <div className="flex items-center gap-[9px] px-4 py-2 border-b border-gray-200">
+                      <div className="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold">
+                          S
+                        </span>
+                      </div>
+                      <span className="text-[16px] font-medium text-black font-inter">
+                        Sarthi
+                      </span>
+                    </div>
+
+                    {/* Chat Messages */}
+                    <div className="p-2 space-y-4">
+                      {/* AI Message 1 */}
+                      <motion.div
+                        className="flex justify-start"
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.4 }}
+                        viewport={{ once: true }}
+                      >
+                        <div className="max-w-[232px] px-4 py-2 rounded-[16px] bg-[#F5F5F5]">
+                          <p className="text-[14px] font-normal text-black font-inter leading-5">
+                            Hi, I noticed you were feeling low yesterday. Want
+                            to talk?
+                          </p>
+                        </div>
+                      </motion.div>
+
+                      {/* User Response */}
+                      <motion.div
+                        className="flex justify-end"
+                        initial={{ opacity: 0, x: 20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                        viewport={{ once: true }}
+                      >
+                        <div className="max-w-[113px] px-4 py-2 rounded-[16px] bg-[rgba(60,155,255,0.78)]">
+                          <p className="text-[14px] font-normal text-white font-inter leading-5">
+                            Yes, please
+                          </p>
+                        </div>
+                      </motion.div>
+
+                      {/* AI Message 2 */}
+                      <motion.div
+                        className="flex justify-start"
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.8 }}
+                        viewport={{ once: true }}
+                      >
+                        <div className="max-w-[226px] px-4 py-2 rounded-[16px] bg-[#F5F5F5]">
+                          <p className="text-[14px] font-normal text-black font-inter leading-5">
+                            How's today going? Anything you'd like to share?
+                          </p>
+                        </div>
+                      </motion.div>
+
+                      {/* Typing Indicator */}
+                      <motion.div
+                        className="flex justify-start"
+                        initial={{ opacity: 0, x: -20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 1.0 }}
+                        viewport={{ once: true }}
+                      >
+                        <div className="px-4 py-2 rounded-[16px] bg-[#F5F5F5]">
+                          <motion.p
+                            className="text-[14px] font-normal text-black font-inter leading-5"
+                            animate={{ opacity: [1, 0.5, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            ...
+                          </motion.p>
+                        </div>
+                      </motion.div>
+                    </div>
+
+                    {/* Chat Input */}
+                    <div className="absolute bottom-4 left-2 right-2">
+                      <div className="w-full h-[39px] rounded-[16px] border border-[#D5D5D5] bg-white flex items-center px-4">
+                        <div className="flex-1 text-gray-400 text-sm"></div>
+                        <div className="w-[39px] h-[39px] rounded-full bg-[#007CFF] flex items-center justify-center ml-2 -mr-4">
+                          <svg
+                            className="w-5 h-5 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Navigation Handle */}
+                  <div className="absolute bottom-[10px] left-1/2 transform -translate-x-1/2">
+                    <div className="w-[108px] h-[4px] rounded-[12px] bg-[#1D1B20]"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Your AI-Powered Wellness Journey Section */}
+      <section className="w-full bg-white py-16 lg:py-24">
+        <div className="w-full max-w-[1440px] mx-auto relative px-4">
+          {/* Title and Description */}
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-[48px] font-bold font-inter leading-normal mb-8">
+              <span className="text-black">Your AI-Powered </span>
+              <span className="text-[#007CFF]">Wellness Journey</span>
+            </h2>
+            <p className="text-[20px] font-normal font-inter text-black leading-[32px] max-w-[982px] mx-auto text-center">
+              Discover how Manova's intelligent system guides you through a
+              personalized mental health experience
+            </p>
+          </motion.div>
+
+          {/* Journey Steps */}
+          <div className="relative">
+            {/* Progress Bar */}
+            <div className="hidden lg:block absolute top-[75px] left-[228px] w-[984px] h-[10px] bg-[#007CFF] rounded-[16px]"></div>
+
+            {/* Steps Container */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-0 relative">
+              {/* Step 1 - Welcome & Assessment */}
+              <motion.div
+                className="flex flex-col items-center text-center lg:ml-[153px]"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                viewport={{ once: true }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-[150px] h-[150px] rounded-full bg-[#E0EAFE] border-4 border-white flex items-center justify-center relative">
+                    <svg
+                      className="w-[60px] h-[60px]"
+                      viewBox="0 0 61 61"
+                      fill="none"
+                    >
+                      <path
+                        d="M19.9404 50.8673C24.7119 53.3149 30.2006 53.9779 35.4176 52.7367C40.6347 51.4956 45.2368 48.4319 48.3948 44.0978C51.5528 39.7636 53.059 34.4441 52.6419 29.0977C52.2248 23.7513 49.9119 18.7297 46.1199 14.9378C42.328 11.1458 37.3064 8.83293 31.96 8.41585C26.6137 7.99876 21.2941 9.50492 16.96 12.6629C12.6258 15.8209 9.56216 20.4231 8.32099 25.6401C7.07981 30.8571 7.74279 36.3459 10.1904 41.1173L5.19043 55.8673L19.9404 50.8673Z"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="absolute -top-[15px] -right-[15px] w-[30px] h-[30px] bg-[#007CFF] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[16px] font-bold font-inter">
+                      1
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[16px] font-bold font-inter text-black mb-2">
+                  Welcome & Assessment
+                </h3>
+                <p className="text-[16px] font-normal font-inter text-black leading-normal max-w-[186px]">
+                  Share your mental health goals and current state through our
+                  intelligent intake process.
+                </p>
+              </motion.div>
+
+              {/* Step 2 - AI Analysis */}
+              <motion.div
+                className="flex flex-col items-center text-center"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                viewport={{ once: true }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-[150px] h-[150px] rounded-full bg-[#E0EAFE] border-4 border-white flex items-center justify-center relative">
+                    <svg
+                      className="w-[60px] h-[60px]"
+                      viewBox="0 0 61 61"
+                      fill="none"
+                    >
+                      <path
+                        d="M30.0952 45.8672V13.3672"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M37.5952 33.3672C35.4322 32.7349 33.5323 31.4188 32.1802 29.6159C30.8281 27.8131 30.0966 25.6207 30.0952 23.3672C30.0939 25.6207 29.3623 27.8131 28.0102 29.6159C26.6581 31.4188 24.7582 32.7349 22.5952 33.3672"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M44.0902 17.1175C44.6655 16.1212 45.0038 15.006 45.0791 13.858C45.1544 12.71 44.9646 11.5601 44.5244 10.4973C44.0842 9.43437 43.4053 8.48701 42.5404 7.72846C41.6755 6.96992 40.6476 6.42051 39.5364 6.12275C38.4251 5.82499 37.2603 5.78686 36.132 6.01131C35.0036 6.23576 33.9421 6.71677 33.0294 7.41713C32.1167 8.11749 31.3774 9.01843 30.8686 10.0502C30.3598 11.0821 30.0952 12.2171 30.0952 13.3675C30.0953 12.2171 29.8307 11.0821 29.3219 10.0502C28.8131 9.01843 28.0737 8.11749 27.161 7.41713C26.2484 6.71677 25.1868 6.23576 24.0585 6.01131C22.9301 5.78686 21.7653 5.82499 20.654 6.12275C19.5428 6.42051 18.515 6.96992 17.65 7.72846C16.7851 8.48701 16.1063 9.43437 15.666 10.4973C15.2258 11.5601 15.036 12.71 15.1113 13.858C15.1866 15.006 15.5249 16.1212 16.1002 17.1175"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M45.0876 13.6797C46.5571 14.0575 47.9214 14.7648 49.0771 15.748C50.2327 16.7311 51.1496 17.9644 51.758 19.3543C52.3665 20.7442 52.6508 22.2544 52.5892 23.7705C52.5276 25.2865 52.1219 26.7687 51.4026 28.1047"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M45.0952 45.867C47.2965 45.8669 49.4362 45.1405 51.1826 43.8004C52.9289 42.4604 54.1843 40.5815 54.754 38.4553C55.3238 36.329 55.176 34.0742 54.3337 32.0404C53.4913 30.0067 52.0015 28.3078 50.0952 27.207"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M50.0127 44.5742C50.1879 45.9298 50.0834 47.3069 49.7055 48.6205C49.3276 49.9341 48.6845 51.1563 47.8157 52.2116C46.947 53.2669 45.8712 54.1329 44.6547 54.7561C43.4381 55.3793 42.1068 55.7465 40.7428 55.8351C39.3788 55.9236 38.0111 55.7315 36.7242 55.2707C35.4374 54.81 34.2586 54.0903 33.2608 53.1561C32.263 52.2219 31.4673 51.0931 30.9228 49.8394C30.3783 48.5856 30.0967 47.2336 30.0952 45.8667C30.0938 47.2336 29.8121 48.5856 29.2676 49.8394C28.7231 51.0931 27.9274 52.2219 26.9296 53.1561C25.9318 54.0903 24.753 54.81 23.4662 55.2707C22.1793 55.7315 20.8116 55.9236 19.4477 55.8351C18.0837 55.7465 16.7523 55.3793 15.5358 54.7561C14.3192 54.1329 13.2434 53.2669 12.3747 52.2116C11.5059 51.1563 10.8628 49.9341 10.4849 48.6205C10.1071 47.3069 10.0025 45.9298 10.1777 44.5742"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M15.0953 45.867C12.894 45.8669 10.7543 45.1405 9.00793 43.8004C7.26158 42.4604 6.00619 40.5815 5.43646 38.4553C4.86672 36.329 5.01448 34.0742 5.85681 32.0404C6.69914 30.0067 8.18897 28.3078 10.0953 27.207"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M15.1028 13.6797C13.6333 14.0575 12.269 14.7648 11.1134 15.748C9.95768 16.7311 9.04088 17.9644 8.43239 19.3543C7.8239 20.7442 7.53968 22.2544 7.60126 23.7705C7.66283 25.2865 8.06858 26.7687 8.78778 28.1047"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="absolute -top-[15px] -right-[15px] w-[30px] h-[30px] bg-[#007CFF] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[16px] font-bold font-inter">
+                      2
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[16px] font-bold font-inter text-black mb-2">
+                  AI Analysis
+                </h3>
+                <p className="text-[16px] font-normal font-inter text-black leading-normal max-w-[186px]">
+                  Our advanced AI analyzes your responses to create a
+                  personalized wellness profile.
+                </p>
+              </motion.div>
+
+              {/* Step 3 - Daily Check-ins */}
+              <motion.div
+                className="flex flex-col items-center text-center"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                viewport={{ once: true }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-[150px] h-[150px] rounded-full bg-[#E0EAFE] border-4 border-white flex items-center justify-center relative">
+                    <svg
+                      className="w-[60px] h-[60px]"
+                      viewBox="0 0 60 61"
+                      fill="none"
+                    >
+                      <path
+                        d="M55 30.6172H48.8C47.7074 30.6149 46.6441 30.9705 45.7728 31.6296C44.9015 32.2888 44.27 33.2152 43.975 34.2672L38.1 55.1672C38.0621 55.297 37.9832 55.4111 37.875 55.4922C37.7668 55.5733 37.6352 55.6172 37.5 55.6172C37.3648 55.6172 37.2332 55.5733 37.125 55.4922C37.0168 55.4111 36.9379 55.297 36.9 55.1672L23.1 6.06719C23.0621 5.93737 22.9832 5.82333 22.875 5.74219C22.7668 5.66105 22.6352 5.61719 22.5 5.61719C22.3648 5.61719 22.2332 5.66105 22.125 5.74219C22.0168 5.82333 21.9379 5.93737 21.9 6.06719L16.025 26.9672C15.7312 28.0151 15.1035 28.9385 14.2372 29.5972C13.3709 30.256 12.3133 30.6141 11.225 30.6172H5"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="absolute -top-[15px] -right-[15px] w-[30px] h-[30px] bg-[#007CFF] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[16px] font-bold font-inter">
+                      3
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[16px] font-bold font-inter text-black mb-2">
+                  Daily Check-ins
+                </h3>
+                <p className="text-[16px] font-normal font-inter text-black leading-normal max-w-[186px]">
+                  Engage with gentle daily prompts that track your mood, energy,
+                  and overall well-being.
+                </p>
+              </motion.div>
+
+              {/* Step 4 - Personalized Recommendations */}
+              <motion.div
+                className="flex flex-col items-center text-center"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-[150px] h-[150px] rounded-full bg-[#E0EAFE] border-4 border-white flex items-center justify-center relative">
+                    <svg
+                      className="w-[60px] h-[60px]"
+                      viewBox="0 0 61 61"
+                      fill="none"
+                    >
+                      <path
+                        d="M30.1294 55.8672C43.9365 55.8672 55.1294 44.6743 55.1294 30.8672C55.1294 17.0601 43.9365 5.86719 30.1294 5.86719C16.3223 5.86719 5.12939 17.0601 5.12939 30.8672C5.12939 44.6743 16.3223 55.8672 30.1294 55.8672Z"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M30.1294 45.8672C38.4137 45.8672 45.1294 39.1515 45.1294 30.8672C45.1294 22.5829 38.4137 15.8672 30.1294 15.8672C21.8451 15.8672 15.1294 22.5829 15.1294 30.8672C15.1294 39.1515 21.8451 45.8672 30.1294 45.8672Z"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M30.1294 35.8672C32.8908 35.8672 35.1294 33.6286 35.1294 30.8672C35.1294 28.1058 32.8908 25.8672 30.1294 25.8672C27.368 25.8672 25.1294 28.1058 25.1294 30.8672C25.1294 33.6286 27.368 35.8672 30.1294 35.8672Z"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="absolute -top-[15px] -right-[15px] w-[30px] h-[30px] bg-[#007CFF] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[16px] font-bold font-inter">
+                      4
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[16px] font-bold font-inter text-black mb-2">
+                  Personalized Recommendations
+                </h3>
+                <p className="text-[16px] font-normal font-inter text-black leading-normal max-w-[186px]">
+                  Receive tailored coping strategies, mindfulness exercises, and
+                  wellness activities.
+                </p>
+              </motion.div>
+
+              {/* Step 5 - Progress Insights */}
+              <motion.div
+                className="flex flex-col items-center text-center"
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.0 }}
+                viewport={{ once: true }}
+              >
+                <div className="relative mb-6">
+                  <div className="w-[150px] h-[150px] rounded-full bg-[#E0EAFE] border-4 border-white flex items-center justify-center relative">
+                    <svg
+                      className="w-[60px] h-[60px]"
+                      viewBox="0 0 61 61"
+                      fill="none"
+                    >
+                      <path
+                        d="M40.2588 18.3672H55.2588V33.3672"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M55.2588 18.3672L34.0088 39.6172L21.5088 27.1172L5.25879 43.3672"
+                        stroke="#007CFF"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div className="absolute -top-[15px] -right-[15px] w-[30px] h-[30px] bg-[#007CFF] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[16px] font-bold font-inter">
+                      5
+                    </span>
+                  </div>
+                </div>
+                <h3 className="text-[16px] font-bold font-inter text-black mb-2">
+                  Progress Insights
+                </h3>
+                <p className="text-[16px] font-normal font-inter text-black leading-normal max-w-[186px]">
+                  Track your mental health journey with detailed analytics and
+                  celebrate your growth.
+                </p>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Bottom CTA */}
+          <motion.div
+            className="text-center mt-16"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.2 }}
+            viewport={{ once: true }}
+          >
+            <p className="text-[20px] font-normal font-inter text-black leading-[32px] max-w-[770px] mx-auto text-center mb-8">
+              Ready to experience personalized AI mental health support that
+              grows with you?
+            </p>
+
+            <motion.button
+              onClick={() => navigate("/signup")}
+              className="flex items-center justify-center py-[16px] px-[24px] gap-[10px] rounded-[24px] bg-[#007CFF] hover:bg-[#0066CC] transition-colors shadow-[0px_2px_20px_0px_rgba(0,0,0,0.25)] w-[270px] h-[50px] mx-auto"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="text-[16px] font-bold font-inter text-white">
+                Begin Your Journey
+              </span>
+            </motion.button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Coming Soon to Mobile Section */}
+      <section className="w-full bg-white py-16 lg:py-24">
+        <div className="w-full max-w-[1440px] mx-auto relative px-4">
+          {/* Main Title */}
+          <motion.div
+            className="text-center mb-12"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-[48px] font-bold font-inter leading-normal">
+              <span className="text-black">Coming soon to </span>
+              <span className="text-[#007CFF]">Mobile devices</span>
+            </h2>
+          </motion.div>
+
+          {/* Email Signup Card */}
+          <motion.div
+            className="flex justify-center"
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            viewport={{ once: true }}
+          >
+            <div className="w-full max-w-[690px] h-[361px] rounded-[50px] bg-white shadow-[0px_6px_40px_rgba(0,0,0,0.40)] relative">
+              {/* Card Content */}
+              <div className="flex flex-col items-center justify-center h-full px-8 py-6">
+                {/* Title and Description */}
+                <div className="text-center mb-8 max-w-[602px]">
+                  <h3 className="text-[24px] font-bold font-inter text-black mb-4">
+                    Get Early Access
+                  </h3>
+                  <p className="text-[16px] font-normal font-inter text-black">
+                    Be the first to experience Monova on mobile and get
+                    exclusive launch benefits
+                  </p>
+                </div>
+
+                {/* Email Input */}
+                <div className="relative w-full max-w-[569px] mb-6">
+                  <div className="w-full h-[60px] rounded-[12px] bg-[#F6F5F5] flex items-center px-6">
+                    <svg
+                      className="w-[24px] h-[24px] mr-4 flex-shrink-0"
+                      viewBox="0 0 25 25"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M22.5303 7.1084L13.5393 12.8354C13.2342 13.0126 12.8876 13.106 12.5348 13.106C12.1819 13.106 11.8354 13.0126 11.5303 12.8354L2.53027 7.1084"
+                        stroke="#777777"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M20.5303 4.1084H4.53027C3.4257 4.1084 2.53027 5.00383 2.53027 6.1084V18.1084C2.53027 19.213 3.4257 20.1084 4.53027 20.1084H20.5303C21.6348 20.1084 22.5303 19.213 22.5303 18.1084V6.1084C22.5303 5.00383 21.6348 4.1084 20.5303 4.1084Z"
+                        stroke="#777777"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <input
+                      type="email"
+                      placeholder="Enter your email address"
+                      className="flex-1 bg-transparent outline-none text-[16px] font-normal font-inter text-[#777] placeholder-[#777]"
+                    />
+                  </div>
+                </div>
+
+                {/* CTA Button */}
+                <motion.button
+                  className="w-[270px] h-[50px] px-6 py-4 rounded-[24px] bg-[#007CFF] hover:bg-[#0066CC] transition-colors shadow-[0px_10px_40px_0px_rgba(0,0,0,0.40)] mb-4"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-[16px] font-bold font-inter text-white">
+                    Notify Me at Launch
+                  </span>
+                </motion.button>
+
+                {/* Disclaimer */}
+                <p className="text-[16px] font-normal font-inter text-[#777] text-center leading-[32px]">
+                  No spam, just launch updates and exclusive early access.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="w-full bg-[#101828] py-16">
+        <div className="w-full max-w-[1440px] mx-auto px-4">
+          {/* Header Section */}
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-16">
+            {/* Brand Section */}
+            <div className="mb-8 lg:mb-0">
+              <div className="flex items-center mb-6">
+                <img
+                  src="/logo/manova-logo.png"
+                  alt="Manova Logo"
+                  className="w-[35px] h-[35px] mr-3 object-contain"
+                />
+                <span className="text-[20px] font-bold font-inter text-white">
+                  Manova
+                </span>
+              </div>
+              <p className="text-[16px] font-normal font-inter text-white leading-5 max-w-[827px]">
+                Empowering mental wellness through AI-driven insights and
+                compassionate support. Your journey to better mental health
+                starts here.
+              </p>
+            </div>
+
+            {/* Connect Section */}
+            <div className="text-center lg:text-right">
+              <h3 className="text-[16px] font-bold font-inter text-white mb-4">
+                Connect with Us
+              </h3>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-full h-px bg-[#B3B2B2] mb-16"></div>
+
+          {/* Links Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            {/* Product Column */}
+            <div>
+              <h4 className="text-[16px] font-bold font-inter text-white mb-6">
+                Product
+              </h4>
+              <ul className="space-y-4">
+                <li>
+                  <Link
+                    to="/features"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Features
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/ai-companion"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    AI Companion
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/community"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Community
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/analytics"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Analytics
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Support Column */}
+            <div>
+              <h4 className="text-[16px] font-bold font-inter text-white mb-6">
+                Support
+              </h4>
+              <ul className="space-y-4">
+                <li>
+                  <Link
+                    to="/help"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Help Center
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/privacy"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/terms"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/contact"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Contact Us
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company Column */}
+            <div>
+              <h4 className="text-[16px] font-bold font-inter text-white mb-6">
+                Company
+              </h4>
+              <ul className="space-y-4">
+                <li>
+                  <Link
+                    to="/about"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/careers"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Careers
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/press"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Press
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/blog"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Blog
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal Column */}
+            <div>
+              <h4 className="text-[16px] font-bold font-inter text-white mb-6">
+                Legal
+              </h4>
+              <ul className="space-y-4">
+                <li>
+                  <Link
+                    to="/privacy"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/terms"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Terms
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/accessibility"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Accessibility
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/cookies"
+                    className="text-[14px] font-normal font-inter text-[#B3B2B2] hover:text-white transition-colors"
+                  >
+                    Cookies
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="text-center">
+            <p className="text-[14px] font-normal font-inter text-[#B3B2B2]">
+              2025 Manova. All rights reserved. Dedicated to mental wellness and
+              AI innovation
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

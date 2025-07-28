@@ -73,11 +73,10 @@ const Navbar = () => {
 
   // Navigation links for landing page (unauthenticated users)
   const landingNavigation = [
-    { name: 'Home', href: '/' },
     { name: 'About', href: '/about' },
     { name: 'How It Works', href: '/how-it-works' },
-    { name: 'Community', href: '/community' },
     { name: 'Support', href: '/support' },
+    { name: 'Community', href: '/community-landing' },
   ];
 
   const isActiveLink = (href) => {
@@ -87,32 +86,27 @@ const Navbar = () => {
   return (
     <>
       {/* Main Navbar */}
-      <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-lg z-50 shadow-sm border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-4 h-[67px] flex items-center justify-between relative">
-          {/* Logo */}
-          <Link to="/" className="flex items-center lg:ml-[120px] ml-4">
-            <img
-              src="/logo/manova-logo.png"
-              alt="Manova Logo"
-              className="w-[35px] h-[35px] mr-3 object-contain"
-            />
-            <span className="text-[20px] font-semibold text-black font-inter leading-normal">
+      <nav className="sticky top-0 z-50 w-full bg-white border-none">
+        <div className="px-16 py-6 flex items-center justify-between">
+          {/* Brand Text */}
+          <Link to={currentUser ? "/home" : "/"} className="flex items-center">
+            <h1 className="text-[48px] italic font-script text-[#1e3a8a] hover:text-[#1E40AF] transition-colors duration-300">
               Manova
-            </span>
+            </h1>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-[50px] absolute left-[430px] top-[24px]">
+          <div className="hidden lg:flex gap-12 items-center">
             {currentUser ? (
               // Authenticated user navigation
               authenticatedNavigation.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
-                  className={`text-[16px] font-bold font-inter transition-colors ${
+                  className={`text-[18px] font-semibold text-[#111827] hover:text-[#2563EB] transition duration-200 ${
                     isActiveLink(link.href)
-                      ? 'text-[#007CFF]'
-                      : 'text-black hover:text-[#007CFF]'
+                      ? 'text-[#2563EB]'
+                      : ''
                   }`}
                 >
                   {link.name}
@@ -124,10 +118,10 @@ const Navbar = () => {
                 <Link
                   key={link.name}
                   to={link.href}
-                  className={`text-[16px] font-bold font-inter transition-colors ${
+                  className={`text-[18px] font-semibold text-[#111827] hover:text-[#2563EB] transition duration-200 ${
                     isActiveLink(link.href)
-                      ? 'text-[#007CFF]'
-                      : 'text-black hover:text-[#007CFF]'
+                      ? 'text-[#2563EB]'
+                      : ''
                   }`}
                 >
                   {link.name}
@@ -137,13 +131,13 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Right Side */}
-          <div className="flex items-center lg:mr-[120px] mr-4 absolute right-[89px] top-[17px]">
+          <div className="flex items-center justify-end">
             {currentUser ? (
               // Authenticated user buttons
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-8">
                 {/* Notification Icon */}
                 <button 
-                  className="relative p-2 rounded-full hover:bg-gray-100 transition-colors" 
+                  className="relative p-2 rounded-full hover:bg-blue-100 transition-colors" 
                   onClick={() => setShowNotif((v) => !v)}
                 >
                   <Bell className="h-5 w-5 text-gray-700" />
@@ -156,13 +150,13 @@ const Navbar = () => {
                 {showNotif && checkinDue && (
                   <div className="absolute right-0 mt-12 w-64 bg-white rounded-xl shadow-lg border border-gray-100 p-4 z-50">
                     <div className="flex items-center gap-2 mb-2">
-                      <Bell className="h-5 w-5 text-[#007CFF]" />
+                      <Bell className="h-5 w-5 text-[#2563EB]" />
                       <span className="font-semibold text-gray-800">Check-In Reminder</span>
                     </div>
                     <p className="text-gray-700 text-sm mb-2">It's time for your check-in! Stay on top of your wellness journey.</p>
                     <Link 
                       to="/survey" 
-                      className="inline-block mt-2 px-4 py-2 bg-[#007CFF] text-white rounded-lg font-medium text-sm hover:bg-[#0066CC] transition-colors"
+                      className="inline-block mt-2 px-4 py-2 bg-[#2563EB] text-white rounded-lg font-medium text-sm hover:bg-[#1d4ed8] transition-colors"
                     >
                       Go to Check-In
                     </Link>
@@ -170,39 +164,47 @@ const Navbar = () => {
                 )}
 
                 {/* User info */}
-                <span className="text-gray-700 text-sm font-medium truncate max-w-xs" title={currentUser.displayName || currentUser.email}>
+                <span className="text-gray-800 text-sm font-medium truncate max-w-xs" title={currentUser.displayName || currentUser.email}>
                   {currentUser.displayName || currentUser.email}
                 </span>
 
                 {/* Logout button */}
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 text-gray-700 hover:text-[#007CFF] font-medium transition-colors"
+                  className="px-4 py-2 text-gray-700 hover:text-[#2563EB] font-medium transition-colors"
                 >
                   Logout
                 </button>
               </div>
             ) : (
-              // Unauthenticated user login button
-              <Link
-                to="/login"
-                className="inline-flex px-4 py-2 bg-[#007CFF] text-white text-[16px] font-bold rounded-[24px] hover:bg-[#0066CC] transition-colors font-inter w-[79px] h-[35px] items-center justify-center"
-              >
-                Log in
-              </Link>
+              // Unauthenticated user auth buttons
+              <div className="flex items-center space-x-8">
+                <Link
+                  to="/login"
+                  className="text-[16px] font-medium text-[#1e3a8a] hover:underline transition duration-200"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/signup"
+                  className="ml-6 px-6 py-3 text-[16px] font-medium bg-[#2563eb] text-white rounded-full shadow-sm hover:bg-[#1e40af] transition"
+                >
+                  Sign Up
+                </Link>
+              </div>
             )}
           </div>
 
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-300"
+            className="lg:hidden p-2 rounded-lg hover:bg-blue-100 transition-colors duration-300"
             aria-label="Toggle mobile menu"
           >
             {isMobileMenuOpen ? (
-              <X className="w-6 h-6 text-[#002959]" />
+              <X className="w-6 h-6 text-gray-700" />
             ) : (
-              <Menu className="w-6 h-6 text-[#002959]" />
+              <Menu className="w-6 h-6 text-gray-700" />
             )}
           </button>
         </div>
@@ -223,13 +225,13 @@ const Navbar = () => {
 
             {/* Mobile Menu */}
             <motion.div
-              className="fixed top-[67px] left-0 right-0 bg-white/95 backdrop-blur-lg border-b border-gray-200 shadow-lg z-50 lg:hidden"
+              className="fixed top-[84px] left-0 right-0 bg-white z-50 lg:hidden border-none"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="max-w-screen-xl mx-auto px-4 py-6">
+              <div className="w-full px-16 py-6">
                 {/* Mobile Navigation Links */}
                 <div className="space-y-4 mb-6">
                   {currentUser ? (
@@ -246,8 +248,8 @@ const Navbar = () => {
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={`block py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                             isActiveLink(link.href)
-                              ? 'text-[#007CFF] bg-blue-50'
-                              : 'text-[#002959] hover:text-[#007CFF] hover:bg-gray-50'
+                              ? 'text-[#2563EB] bg-gray-50'
+                              : 'text-gray-700 hover:text-[#2563EB] hover:bg-blue-100'
                           }`}
                         >
                           {link.name}
@@ -268,8 +270,8 @@ const Navbar = () => {
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={`block py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
                             isActiveLink(link.href)
-                              ? 'text-[#007CFF] bg-blue-50'
-                              : 'text-[#002959] hover:text-[#007CFF] hover:bg-gray-50'
+                              ? 'text-[#2563EB] bg-gray-50'
+                              : 'text-gray-700 hover:text-[#2563EB] hover:bg-blue-100'
                           }`}
                         >
                           {link.name}
@@ -286,19 +288,19 @@ const Navbar = () => {
                     <div className="space-y-3">
                       {/* Notification for mobile */}
                       <button 
-                        className="relative p-3 rounded-lg hover:bg-gray-50 transition-colors w-full text-left flex items-center gap-3" 
+                        className="relative p-3 rounded-lg hover:bg-blue-100 transition-colors w-full text-left flex items-center gap-3" 
                         onClick={() => setShowNotif((v) => !v)}
                       >
                         <Bell className="h-5 w-5 text-gray-700" />
                         {checkinDue && (
                           <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                         )}
-                        <span className="font-medium text-gray-700">Notifications</span>
+                        <span className="font-medium text-[#111827]">Notifications</span>
                       </button>
                       
                       <button
                         onClick={handleLogout}
-                        className="w-full px-4 py-3 text-gray-700 hover:text-[#007CFF] font-medium transition-colors text-left"
+                        className="w-full px-4 py-3 text-gray-700 hover:text-[#2563EB] font-medium transition-colors text-left"
                       >
                         Logout
                       </button>
@@ -309,14 +311,14 @@ const Navbar = () => {
                       <Link
                         to="/login"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="block w-full px-4 py-3 text-center text-gray-700 hover:text-[#007CFF] font-medium transition-colors"
+                        className="block w-full px-4 py-3 text-center text-[16px] text-[#1e3a8a] hover:underline font-medium transition-colors"
                       >
                         Log In
                       </Link>
                       <Link
                         to="/signup"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="block w-full px-4 py-3 text-center bg-[#007CFF] text-white rounded-lg font-medium hover:bg-[#0066CC] transition-colors"
+                        className="block w-full px-4 py-3 text-center text-[16px] bg-[#2563EB] text-white rounded-full font-medium hover:bg-[#1e40af] transition-colors shadow-sm"
                       >
                         Sign Up
                       </Link>

@@ -1,86 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, User, Tag, Clock, ArrowRight } from 'lucide-react';
-// Navbar is now handled globally in App.jsx
+import { Calendar, User, Tag, Clock, ArrowRight, Plus, LogIn } from 'lucide-react';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import AddArticle from '../components/AddArticle';
 
 const ArticlesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [articles, setArticles] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchArticles = async () => {
       try {
         setIsLoading(true);
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const articlesRef = collection(db, 'articles');
+        const q = query(articlesRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
         
-        const fetchedArticles = [
-          {
-            id: 1,
-            title: 'Understanding and Managing Anxiety in Daily Life',
-            category: 'Wellness',
-            author: 'Dr. Sarah Chen',
-            date: 'March 15, 2024',
-            readTime: '5 min read',
-            excerpt: 'Practical strategies for managing anxiety in your daily routine, backed by clinical research and real-world applications.',
-            image: 'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          },
-          {
-            id: 2,
-            title: 'The Science of Better Sleep: Evidence-Based Techniques',
-            category: 'Health',
-            author: 'Dr. Michael Rodriguez',
-            date: 'March 14, 2024',
-            readTime: '7 min read',
-            excerpt: 'Discover the latest research on sleep hygiene, circadian rhythms, and practical tips for achieving better sleep quality.',
-            image: 'https://images.unsplash.com/photo-1511295742362-92c96b1cf484?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          },
-          {
-            id: 3,
-            title: 'Building Healthy Relationships in the Modern World',
-            category: 'Relationships',
-            author: 'Dr. Emily Thompson',
-            date: 'March 13, 2024',
-            readTime: '6 min read',
-            excerpt: 'Expert advice on nurturing meaningful connections and maintaining healthy boundaries in personal and professional relationships.',
-            image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          },
-          {
-            id: 4,
-            title: 'Mindfulness at Work: Reducing Stress and Increasing Focus',
-            category: 'Career',
-            author: 'Dr. James Wilson',
-            date: 'March 12, 2024',
-            readTime: '8 min read',
-            excerpt: 'Learn how to integrate mindfulness practices into your work routine to reduce stress and enhance productivity.',
-            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          },
-          {
-            id: 5,
-            title: 'Overcoming Perfectionism: A Path to Self-Compassion',
-            category: 'Wellness',
-            author: 'Dr. Lisa Park',
-            date: 'March 11, 2024',
-            readTime: '5 min read',
-            excerpt: 'Understanding the roots of perfectionism and developing healthier ways to achieve your goals without burning out.',
-            image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          },
-          {
-            id: 6,
-            title: 'Digital Wellness: Managing Technology for Mental Health',
-            category: 'Health',
-            author: 'Dr. Alex Kumar',
-            date: 'March 10, 2024',
-            readTime: '6 min read',
-            excerpt: 'Practical strategies for creating a healthy relationship with technology and social media in our digital age.',
-            image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-          }
-        ];
+        const fetchedArticles = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Convert Firestore timestamp to readable date
+          date: doc.data().createdAt?.toDate().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }) || 'Recently'
+        }));
         
         setArticles(fetchedArticles);
       } catch (err) {
         console.error('Error fetching articles:', err);
+        // If no articles exist yet, show empty state
+        setArticles([]);
       } finally {
         setIsLoading(false);
       }
@@ -101,6 +59,33 @@ const ArticlesPage = () => {
     ? articles 
     : articles.filter(article => article.category.toLowerCase() === selectedCategory);
 
+  const handleArticleAdded = () => {
+    // Refetch articles when a new one is added
+    const fetchArticles = async () => {
+      try {
+        const articlesRef = collection(db, 'articles');
+        const q = query(articlesRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        
+        const fetchedArticles = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().createdAt?.toDate().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }) || 'Recently'
+        }));
+        
+        setArticles(fetchedArticles);
+      } catch (err) {
+        console.error('Error refetching articles:', err);
+      }
+    };
+    
+    fetchArticles();
+  };
+
   const getCategoryColor = (category) => {
     const colors = {
       'Wellness': 'bg-green-100 text-green-800',
@@ -113,34 +98,56 @@ const ArticlesPage = () => {
 
   if (isLoading) {
     return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-gray-50 py-16 px-4 sm:px-8 lg:px-16">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-center h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
+      <div className="min-h-screen bg-gray-50 py-16 px-4 sm:px-8 lg:px-16">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
+  const handlePostArticle = () => {
+    if (currentUser) {
+      setShowAddForm(true);
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-16 px-4 sm:px-8 lg:px-16">
-        <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 px-4 sm:px-8 lg:px-16">
+        <div className="max-w-7xl mx-auto pt-8">
           {/* Page Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-16"
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-              Explore Mental Wellness Insights
-            </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-              Expert-curated articles to help you navigate your mental wellness journey with evidence-based insights and practical guidance.
-            </p>
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-8">
+              <div className="flex-1 mb-6 lg:mb-0">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
+                  Mental Wellness Insights
+                </h1>
+                <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+                  Expert-curated articles to help you navigate your mental wellness journey with evidence-based insights and practical guidance.
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handlePostArticle}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-2xl font-semibold transition-all duration-300 shadow-lg ${
+                  currentUser 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white' 
+                    : 'bg-white/70 backdrop-blur-sm border border-white/50 text-blue-600 hover:bg-white/80'
+                }`}
+              >
+                {currentUser ? <Plus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
+                <span>{currentUser ? 'Post Article' : 'Login to Post'}</span>
+              </motion.button>
+            </div>
           </motion.div>
 
           {/* Category Filter */}
@@ -154,10 +161,10 @@ const ArticlesPage = () => {
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-6 py-3 rounded-full font-medium transition-all duration-300 ${
+                className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 backdrop-blur-sm ${
                   selectedCategory === category.id
-                    ? 'bg-indigo-600 text-white shadow-lg transform scale-105'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 shadow-sm'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105'
+                    : 'bg-white/70 border border-white/50 text-gray-700 hover:bg-white/80 hover:scale-105 shadow-md'
                 }`}
               >
                 {category.name}
@@ -180,8 +187,8 @@ const ArticlesPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
+                  whileHover={{ y: -12, scale: 1.02, transition: { duration: 0.3 } }}
+                  className="bg-white/70 backdrop-blur-sm border border-white/50 rounded-3xl shadow-lg hover:shadow-xl hover:bg-white/80 transition-all duration-300 overflow-hidden group cursor-pointer"
                 >
                   {/* Article Image */}
                   <div className="relative overflow-hidden">
@@ -233,7 +240,7 @@ const ArticlesPage = () => {
 
                     {/* Read More Button */}
                     <div className="mt-4 flex items-center justify-end">
-                      <div className="flex items-center text-indigo-600 font-medium text-sm group-hover:text-indigo-700 transition-colors duration-300">
+                      <div className="flex items-center text-blue-600 font-semibold text-sm group-hover:text-blue-700 transition-colors duration-300">
                         <span>Read More</span>
                         <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
                       </div>
@@ -259,6 +266,13 @@ const ArticlesPage = () => {
             </motion.div>
           )}
         </div>
+
+        {/* Add Article Modal */}
+        <AddArticle
+          isOpen={showAddForm}
+          onClose={() => setShowAddForm(false)}
+          onArticleAdded={handleArticleAdded}
+        />
       </div>
   );
 };

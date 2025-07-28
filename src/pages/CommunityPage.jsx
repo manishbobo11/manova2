@@ -13,7 +13,13 @@ import {
   ThumbsUp,
   Flag,
   AlertCircle,
+  Plus,
+  LogIn,
 } from 'lucide-react';
+import { collection, getDocs, addDoc, orderBy, query, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const CommunityPage = () => {
   const [newPost, setNewPost] = useState('');
@@ -27,85 +33,35 @@ const CommunityPage = () => {
   const [showCommentForm, setShowCommentForm] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
-  // Simulated API call to fetch posts
+  // Fetch posts from Firestore
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         setIsLoading(true);
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const postsRef = collection(db, 'community_posts');
+        const q = query(postsRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
         
-        // This would be replaced with actual API call
-        const fetchedPosts = [
-          {
-            id: 1,
-            author: 'Sarah M.',
-            avatar: '👩',
-            role: 'Member',
-            content: 'I\'ve been feeling anxious about my upcoming presentation. Any tips for managing presentation anxiety?',
-            likes: 45,
-            comments: [
-              {
-                id: 1,
-                author: 'Dr. Chen',
-                role: 'Therapist',
-                content: 'Try practicing deep breathing exercises before your presentation. Also, remember that some anxiety is normal and can actually enhance your performance.',
-                timestamp: '1h ago',
-                likes: 12,
-              },
-              {
-                id: 2,
-                author: 'Michael R.',
-                role: 'Member',
-                content: 'I find that practicing in front of a mirror helps me build confidence. Also, recording yourself and watching it back can be very helpful!',
-                timestamp: '45m ago',
-                likes: 8,
-              }
-            ],
-            timeAgo: '2h',
-            category: 'questions',
-            tags: ['Anxiety', 'Public Speaking', 'Self-Help']
-          },
-          {
-            id: 2,
-            author: 'James K.',
-            avatar: '👨',
-            role: 'Member',
-            content: 'Sharing my experience with meditation: Started with just 2 minutes a day and gradually increased. The difference in my stress levels is remarkable!',
-            likes: 23,
-            comments: [
-              {
-                id: 3,
-                author: 'Dr. Thompson',
-                role: 'Therapist',
-                content: 'That\'s wonderful progress! Consistency is key with meditation. Would you like to share what specific techniques you found most helpful?',
-                timestamp: '2h ago',
-                likes: 15,
-              }
-            ],
-            timeAgo: '4h',
-            category: 'experiences',
-            tags: ['Meditation', 'Stress Relief', 'Personal Growth']
-          },
-          {
-            id: 3,
-            author: 'Dr. Thompson',
-            avatar: '👩‍⚕️',
-            role: 'Therapist',
-            content: 'Quick tip: When feeling overwhelmed, try the 5-4-3-2-1 grounding technique. Name 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell, and 1 you can taste.',
-            likes: 67,
-            comments: [],
-            timeAgo: '6h',
-            category: 'advice',
-            tags: ['Grounding', 'Anxiety Management', 'Self-Care']
-          },
-        ];
+        const fetchedPosts = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            timeAgo: data.createdAt?.toDate() ? getTimeAgo(data.createdAt.toDate()) : 'Recently',
+            comments: data.comments || []
+          };
+        });
         
         setPosts(fetchedPosts);
         setError(null);
       } catch (err) {
+        console.error('Error fetching posts:', err);
         setError('Failed to load posts. Please try again later.');
+        setPosts([]); // Show empty state if no posts exist yet
       } finally {
         setIsLoading(false);
       }
@@ -113,6 +69,23 @@ const CommunityPage = () => {
 
     fetchPosts();
   }, []);
+
+  // Helper function to calculate time ago
+  const getTimeAgo = (date) => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    
+    return date.toLocaleDateString();
+  };
 
   const categories = [
     { id: 'all', name: 'All Discussions' },
@@ -124,44 +97,72 @@ const CommunityPage = () => {
   const handlePost = async (e) => {
     e.preventDefault();
     if (!newPost.trim()) return;
+    if (!currentUser) {
+      setError('You must be logged in to post.');
+      return;
+    }
 
     try {
-      // This would be replaced with actual API call
-      const newPostObj = {
-        id: Date.now(),
-        author: 'You',
+      const postData = {
+        author: currentUser.displayName || currentUser.email,
+        authorId: currentUser.uid,
         avatar: '👤',
         role: 'Member',
         content: newPost,
         likes: 0,
         comments: [],
-        timeAgo: 'Just now',
         category: 'questions',
-        tags: ['New Post']
+        tags: ['Discussion'],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, 'community_posts'), postData);
+      
+      // Add the new post to local state with generated ID
+      const newPostObj = {
+        id: docRef.id,
+        ...postData,
+        timeAgo: 'Just now',
+        createdAt: new Date() // For immediate display
       };
 
       setPosts(prev => [newPostObj, ...prev]);
       setNewPost('');
       setShowPostForm(false);
     } catch (err) {
+      console.error('Error creating post:', err);
       setError('Failed to create post. Please try again.');
     }
   };
 
   const handleComment = async (postId) => {
     if (!newComment[postId]?.trim()) return;
+    if (!currentUser) {
+      setError('You must be logged in to comment.');
+      return;
+    }
 
     try {
-      // This would be replaced with actual API call
       const comment = {
-        id: Date.now(),
-        author: 'You',
+        id: Date.now().toString(),
+        author: currentUser.displayName || currentUser.email,
+        authorId: currentUser.uid,
         role: 'Member',
         content: newComment[postId],
         timestamp: 'Just now',
-        likes: 0
+        likes: 0,
+        createdAt: new Date()
       };
 
+      // Update Firestore document
+      const postRef = doc(db, 'community_posts', postId);
+      await updateDoc(postRef, {
+        comments: arrayUnion(comment),
+        updatedAt: serverTimestamp()
+      });
+
+      // Update local state
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           return {
@@ -175,6 +176,7 @@ const CommunityPage = () => {
       setNewComment(prev => ({ ...prev, [postId]: '' }));
       setShowCommentForm(null);
     } catch (err) {
+      console.error('Error adding comment:', err);
       setError('Failed to add comment. Please try again.');
     }
   };
@@ -263,36 +265,59 @@ const CommunityPage = () => {
     );
   }
 
+  const handleShareThought = () => {
+    if (currentUser) {
+      setShowPostForm(true);
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 py-12">
       <div className="w-full px-4 sm:px-8 lg:px-16">
         <div className="max-w-[1440px] mx-auto w-full flex justify-center">
           <div className="w-full max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-lg"
+          className="bg-white/70 backdrop-blur-sm border border-white/50 rounded-3xl p-8 shadow-xl"
         >
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Community</h1>
-            <div className="flex items-center space-x-2 text-blue-600">
-              <Shield className="w-5 h-5" />
-              <span className="text-sm font-medium">Safe Space</span>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8">
+            <div className="mb-4 lg:mb-0">
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Community</h1>
+              <div className="flex items-center space-x-2 text-blue-600">
+                <Shield className="w-5 h-5" />
+                <span className="text-sm font-semibold">Safe Space for Everyone</span>
+              </div>
             </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleShareThought}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-2xl font-semibold transition-all duration-300 shadow-lg ${
+                currentUser 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white' 
+                  : 'bg-white/70 backdrop-blur-sm border border-white/50 text-blue-600 hover:bg-white/80'
+              }`}
+            >
+              {currentUser ? <Plus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
+              <span>{currentUser ? 'Share Thought' : 'Login to Share'}</span>
+            </motion.button>
           </div>
 
           {/* Categories */}
-          <div className="flex space-x-4 mb-8 overflow-x-auto pb-2">
+          <div className="flex flex-wrap justify-center gap-4 mb-8">
             {categories.map((category) => (
               <motion.button
                 key={category.id}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 backdrop-blur-sm ${
                   selectedCategory === category.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                    : 'bg-white/60 border border-white/50 text-gray-700 hover:bg-white/80 hover:scale-105 shadow-md'
                 }`}
               >
                 {category.name}
@@ -302,7 +327,7 @@ const CommunityPage = () => {
 
           {/* New Post Form */}
           <AnimatePresence>
-            {showPostForm ? (
+            {showPostForm && currentUser ? (
               <motion.form
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -310,31 +335,31 @@ const CommunityPage = () => {
                 onSubmit={handlePost}
                 className="mb-8"
               >
-                <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl p-6 shadow-lg">
                   <textarea
                     value={newPost}
                     onChange={(e) => setNewPost(e.target.value)}
                     placeholder="Share your thoughts or ask a question..."
-                    className="w-full h-24 p-2 border-0 focus:ring-0 resize-none"
+                    className="w-full h-24 p-4 border-0 focus:ring-0 resize-none bg-transparent placeholder-gray-500 text-gray-800"
                   />
-                  <div className="flex justify-between items-center mt-2">
+                  <div className="flex justify-between items-center mt-4">
                     <div className="flex space-x-2">
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         type="button"
-                        className="p-2 text-gray-500 hover:text-blue-600"
+                        className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-white/50"
                       >
                         <TrendingUp className="w-5 h-5" />
                       </motion.button>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-3">
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         type="button"
                         onClick={() => setShowPostForm(false)}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
                       >
                         Cancel
                       </motion.button>
@@ -342,23 +367,28 @@ const CommunityPage = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         type="submit"
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-2 rounded-2xl font-semibold transition-all duration-300 shadow-md"
                       >
-                        Post
+                        Share
                       </motion.button>
                     </div>
                   </div>
                 </div>
               </motion.form>
-            ) : (
+            ) : currentUser ? (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowPostForm(true)}
-                className="w-full mb-8 p-4 bg-white rounded-xl shadow-sm text-left text-gray-500 hover:text-gray-700 transition-colors"
+                className="w-full mb-8 p-6 bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl shadow-lg text-left text-gray-500 hover:text-gray-700 hover:bg-white/70 transition-all duration-300"
               >
                 Share your thoughts or ask a question...
               </motion.button>
+            ) : (
+              <div className="w-full mb-8 p-6 bg-white/40 backdrop-blur-sm border border-white/50 rounded-2xl shadow-md text-center">
+                <p className="text-gray-700 mb-2 font-semibold">Join our community discussions</p>
+                <p className="text-gray-600">Please log in to share your thoughts or ask questions</p>
+              </div>
             )}
           </AnimatePresence>
 
@@ -370,7 +400,7 @@ const CommunityPage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-xl p-4 shadow-sm"
+                className="bg-white/60 backdrop-blur-sm border border-white/50 rounded-2xl p-6 shadow-lg hover:bg-white/70 transition-all duration-300"
               >
                 <div className="flex items-start space-x-3">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl">
@@ -437,7 +467,7 @@ const CommunityPage = () => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            className="bg-gray-50 rounded-lg p-3"
+                            className="bg-white/40 backdrop-blur-sm border border-white/30 rounded-2xl p-4"
                           >
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center space-x-2">
@@ -492,14 +522,15 @@ const CommunityPage = () => {
                           value={newComment[post.id] || ''}
                           onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
                           placeholder="Write a comment..."
-                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full p-4 bg-white/50 backdrop-blur-sm border border-white/40 rounded-2xl focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
+                          rows="3"
                         />
-                        <div className="flex justify-end space-x-2 mt-2">
+                        <div className="flex justify-end space-x-3 mt-3">
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setShowCommentForm(null)}
-                            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
                           >
                             Cancel
                           </motion.button>
@@ -507,7 +538,7 @@ const CommunityPage = () => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleComment(post.id)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-semibold transition-all duration-300 shadow-md"
                           >
                             Comment
                           </motion.button>

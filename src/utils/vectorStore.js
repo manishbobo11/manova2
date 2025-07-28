@@ -55,30 +55,33 @@ export const upsertUserVector = async (userId, embedding, metadata = {}) => {
     
     // Handle standard success response with insertedCount
     if (data.status === 'success' || data.insertedCount) {
-      console.log(`✅ Vector upserted successfully for user ${userId}:`, data.id);
+      const vectorId = data.id || data.vectorId || `mock_${userId}_${Date.now()}`;
+      console.log(`✅ Vector upserted successfully for user ${userId}:`, vectorId);
       return {
         success: true,
-        vectorId: data.id,
+        vectorId: vectorId,
         insertedCount: data.insertedCount
       };
     }
     
     // Handle legacy success format
     if (data.success) {
-      console.log(`✅ Vector upserted successfully for user ${userId}:`, data.vectorId);
+      const vectorId = data.id || data.vectorId || `mock_${userId}_${Date.now()}`;
+      console.log(`✅ Vector upserted successfully for user ${userId}:`, vectorId);
       return {
         success: true,
-        vectorId: data.vectorId || `mock_${userId}_${Date.now()}`,
+        vectorId: vectorId,
         metadata: data.metadata || {}
       };
     }
     
     // Handle mock/fallback response format
     if (data.mock && data.message) {
-      console.log(`🔧 Using mock vector service: ${data.message}`);
+      const vectorId = data.id || data.vectorId || `mock_${userId}_${Date.now()}`;
+      console.log(`🔧 Using mock vector service: ${data.message}. Vector ID: ${vectorId}`);
       return {
         success: true,
-        vectorId: data.vectorId || `mock_${userId}_${Date.now()}`,
+        vectorId: vectorId,
         metadata: data.metadata || {}
       };
     }

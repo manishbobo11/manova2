@@ -79,11 +79,11 @@ const TherapistCard = ({
 
   if (isModern) {
     return (
-      <div className={`bg-white/80 backdrop-blur-sm rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-white/20 group ${className}`}>
+      <div className={`bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#D8D8D8] group ${className}`}>
         {/* Match Badge */}
         {matchScore && (
           <div className="absolute top-4 right-4 z-10">
-            <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+            <div className="bg-[#007CFF] text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
               <Sparkles className="inline w-3 h-3 mr-1" />
               {matchScore}% Match
             </div>
@@ -95,7 +95,7 @@ const TherapistCard = ({
           <div className="flex items-start space-x-4">
             {/* Avatar */}
             <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+              <div className="w-20 h-20 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
                 <img 
                   src={avatar || '/images/default-avatar.svg'} 
                   alt={name}
@@ -103,23 +103,23 @@ const TherapistCard = ({
                 />
               </div>
               {/* Online Status */}
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-3 border-white flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#007CFF] rounded-full border-3 border-white flex items-center justify-center">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
               </div>
             </div>
             
             {/* Basic Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">{name}</h3>
-              <p className="text-sm text-slate-600 mb-2">{credentials}</p>
+              <h3 className="text-xl font-bold text-black mb-1 truncate">{name}</h3>
+              <p className="text-sm text-[#777] mb-2">{credentials}</p>
               
               {/* Rating */}
               <div className="flex items-center space-x-2 mb-3">
                 <div className="flex items-center space-x-1">
                   <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                  <span className="text-sm font-semibold text-slate-700">{rating}</span>
+                  <span className="text-sm font-semibold text-black">{rating}</span>
                 </div>
-                <span className="text-xs text-slate-500">({reviewCount} reviews)</span>
+                <span className="text-xs text-[#777]">({reviewCount} reviews)</span>
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ const TherapistCard = ({
 
         {/* Bio */}
         <div className="px-6 mb-4">
-          <p className="text-sm text-slate-600 leading-relaxed line-clamp-2">
+          <p className="text-sm text-[#777] leading-relaxed line-clamp-2">
             {bio}
           </p>
         </div>
@@ -156,27 +156,27 @@ const TherapistCard = ({
         <div className="px-6 mb-6">
           <div className="grid grid-cols-2 gap-4 text-xs">
             {/* Experience */}
-            <div className="flex items-center space-x-2 text-slate-600">
-              <Award className="w-4 h-4 text-blue-500" />
+            <div className="flex items-center space-x-2 text-[#777]">
+              <Award className="w-4 h-4 text-[#007CFF]" />
               <span>{experience} experience</span>
             </div>
             
             {/* Languages */}
-            <div className="flex items-center space-x-2 text-slate-600">
-              <Globe className="w-4 h-4 text-emerald-500" />
+            <div className="flex items-center space-x-2 text-[#777]">
+              <Globe className="w-4 h-4 text-[#007CFF]" />
               <span>{languages.slice(0, 2).join(', ')}</span>
             </div>
             
             {/* Location */}
-            <div className="flex items-center space-x-2 text-slate-600">
-              <MapPin className="w-4 h-4 text-red-500" />
+            <div className="flex items-center space-x-2 text-[#777]">
+              <MapPin className="w-4 h-4 text-[#007CFF]" />
               <span className="truncate">{location}</span>
             </div>
             
             {/* Mode */}
-            <div className="flex items-center space-x-2 text-slate-600">
+            <div className="flex items-center space-x-2 text-[#777]">
               {mode.includes('Online') ? (
-                <Video className="w-4 h-4 text-purple-500" />
+                <Video className="w-4 h-4 text-[#007CFF]" />
               ) : (
                 <MessageCircle className="w-4 h-4 text-purple-500" />
               )}
@@ -198,8 +198,8 @@ const TherapistCard = ({
             
             {/* Next Available */}
             <div className="text-right">
-              <p className="text-xs text-slate-500">Next available</p>
-              <div className="flex items-center space-x-1 text-sm font-medium text-emerald-600">
+              <p className="text-xs text-[#777]">Next available</p>
+              <div className="flex items-center space-x-1 text-sm font-medium text-[#007CFF]">
                 <Clock className="w-4 h-4" />
                 <span>Today 2pm</span>
               </div>
@@ -209,10 +209,10 @@ const TherapistCard = ({
           {/* CTA Button */}
           <motion.button
             onClick={handleBookingClick}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 px-6 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 group-hover:scale-105"
+            className="w-full bg-[#007CFF] hover:bg-[#0066CC] text-white py-4 px-6 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 group-hover:scale-105"
             whileHover={{ 
               scale: 1.02,
-              boxShadow: "0 20px 25px -5px rgba(59, 130, 246, 0.3)"
+              boxShadow: "0 20px 25px -5px rgba(0, 124, 255, 0.3)"
             }}
             whileTap={{ scale: 0.98 }}
           >

@@ -10,8 +10,10 @@ let index = null;
 
 const initializePinecone = async () => {
   if (!pinecone) {
+    const apiKey = process.env.PINECONE_API_KEY || "pcsk_2mEsDs_CxvhYsZbQbS1LWBCUjgF2Hkub9Wjr3bXXHPEaeuvqSgbDM6YjqbSPyS3aFPeD7C";
     pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY || "pcsk_2mEsDs_CxvhYsZbQbS1LWBCUjgF2Hkub9Wjr3bXXHPEaeuvqSgbDM6YjqbSPyS3aFPeD7C",
+      apiKey,
+      environment: process.env.PINECONE_ENVIRONMENT
     });
   }
   

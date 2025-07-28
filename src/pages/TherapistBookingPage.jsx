@@ -103,41 +103,12 @@ const TherapistBookingPage = () => {
   ).length + (searchQuery.trim() ? 1 : 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+    <div className="min-h-screen bg-white pt-4">
       {/* Modern Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-indigo-600/5 to-purple-600/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-blue-50" />
         
-        {/* Header Navigation */}
-        <div className="relative z-10 bg-white/80 backdrop-blur-lg border-b border-gray-100/50 sticky top-0">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <motion.button
-                onClick={() => navigate(-1)}
-                className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors"
-                whileHover={{ x: -2 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="text-sm font-medium">Back</span>
-              </motion.button>
-              
-              {/* Trust Indicators */}
-              <div className="hidden md:flex items-center space-x-6 text-sm">
-                <div className="flex items-center space-x-1 text-emerald-600">
-                  <Shield className="w-4 h-4" />
-                  <span className="font-medium">Licensed & Verified</span>
-                </div>
-                <div className="flex items-center space-x-1 text-blue-600">
-                  <Heart className="w-4 h-4" />
-                  <span className="font-medium">98% Satisfaction</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Hero Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
           <motion.div 
@@ -146,14 +117,14 @@ const TherapistBookingPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6 leading-tight">
               Your Personalized 
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="text-[#007CFF]">
                 Therapist Matches
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-slate-600 mb-8 leading-relaxed">
+            <p className="text-xl md:text-2xl text-black mb-8 leading-relaxed">
               Connect with licensed therapists who understand your unique journey. 
               <br className="hidden sm:block" />
               Find the perfect match for your mental wellness goals.
@@ -167,12 +138,12 @@ const TherapistBookingPage = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                <div className="p-2 bg-purple-100 rounded-full">
-                  <Users className="w-5 h-5 text-purple-600" />
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Users className="w-5 h-5 text-[#007CFF]" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-800">500+</div>
-                  <div className="text-sm text-slate-600">Licensed Therapists</div>
+                  <div className="text-2xl font-bold text-black">500+</div>
+                  <div className="text-sm text-[#777]">Licensed Therapists</div>
                 </div>
               </motion.div>
               
@@ -182,12 +153,12 @@ const TherapistBookingPage = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                <div className="p-2 bg-yellow-100 rounded-full">
-                  <Star className="w-5 h-5 text-yellow-600" />
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Star className="w-5 h-5 text-[#007CFF]" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-800">4.9</div>
-                  <div className="text-sm text-slate-600">Average Rating</div>
+                  <div className="text-2xl font-bold text-black">4.9</div>
+                  <div className="text-sm text-[#777]">Average Rating</div>
                 </div>
               </motion.div>
               
@@ -197,12 +168,12 @@ const TherapistBookingPage = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.6 }}
               >
-                <div className="p-2 bg-emerald-100 rounded-full">
-                  <Clock className="w-5 h-5 text-emerald-600" />
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Clock className="w-5 h-5 text-[#007CFF]" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-800">24/7</div>
-                  <div className="text-sm text-slate-600">Support Available</div>
+                  <div className="text-2xl font-bold text-black">24/7</div>
+                  <div className="text-sm text-[#777]">Support Available</div>
                 </div>
               </motion.div>
             </div>
@@ -213,27 +184,27 @@ const TherapistBookingPage = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {/* Modern Search & Filter Section */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-100/50 shadow-lg p-6 mb-12">
+        <div className="bg-white rounded-3xl border border-[#D8D8D8] shadow-lg p-6 mb-12">
           {/* Search Bar */}
           <div className="relative mb-6">
-            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#777]" />
             <input
               type="text"
               placeholder="Search therapists by name, specialty, or language..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 bg-white/80 border-0 rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all text-slate-700 placeholder-slate-400 text-lg"
+              className="w-full pl-14 pr-6 py-4 bg-white border border-[#C5C5C5] rounded-2xl shadow-sm focus:ring-2 focus:ring-[#007CFF]/20 focus:border-[#007CFF] transition-all text-black placeholder-[#777] text-lg"
             />
           </div>
 
           {/* Pill-style Filters */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-700">Filter by preferences</h3>
+              <h3 className="text-lg font-semibold text-black">Filter by preferences</h3>
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  className="text-sm text-[#007CFF] hover:text-[#0066CC] font-medium transition-colors"
                 >
                   Clear all ({activeFilterCount})
                 </button>
@@ -242,7 +213,7 @@ const TherapistBookingPage = () => {
             
             {/* Specialization Pills */}
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">
+              <label className="block text-sm font-medium text-[#777] mb-2">
                 <Brain className="inline w-4 h-4 mr-1" />
                 Specialization
               </label>
@@ -253,8 +224,8 @@ const TherapistBookingPage = () => {
                     onClick={() => handleFilterChange('stressType', type)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       filters.stressType === type
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-white/80 text-slate-600 hover:bg-blue-50 hover:text-blue-700 border border-gray-200'
+                        ? 'bg-[#007CFF] text-white shadow-lg'
+                        : 'bg-white text-[#777] hover:bg-blue-50 hover:text-[#007CFF] border border-[#C5C5C5]'
                     }`}
                   >
                     {type === 'All Specializations' ? 'All' : type}
@@ -265,7 +236,7 @@ const TherapistBookingPage = () => {
             
             {/* Language Pills */}
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">
+              <label className="block text-sm font-medium text-[#777] mb-2">
                 <Globe className="inline w-4 h-4 mr-1" />
                 Language
               </label>
@@ -276,8 +247,8 @@ const TherapistBookingPage = () => {
                     onClick={() => handleFilterChange('language', lang)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       filters.language === lang
-                        ? 'bg-purple-600 text-white shadow-lg'
-                        : 'bg-white/80 text-slate-600 hover:bg-purple-50 hover:text-purple-700 border border-gray-200'
+                        ? 'bg-[#007CFF] text-white shadow-lg'
+                        : 'bg-white text-[#777] hover:bg-blue-50 hover:text-[#007CFF] border border-[#C5C5C5]'
                     }`}
                   >
                     {lang === 'All Languages' ? 'All Languages' : `${lang === 'Hindi' ? '🇮🇳' : lang === 'English' ? '🇺🇸' : '🌐'} ${lang}`}
@@ -288,7 +259,7 @@ const TherapistBookingPage = () => {
             
             {/* Session Mode Pills */}
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-2">
+              <label className="block text-sm font-medium text-[#777] mb-2">
                 <MessageCircle className="inline w-4 h-4 mr-1" />
                 Session Type
               </label>
@@ -299,8 +270,8 @@ const TherapistBookingPage = () => {
                     onClick={() => handleFilterChange('mode', mode)}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       filters.mode === mode
-                        ? 'bg-emerald-600 text-white shadow-lg'
-                        : 'bg-white/80 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 border border-gray-200'
+                        ? 'bg-[#007CFF] text-white shadow-lg'
+                        : 'bg-white text-[#777] hover:bg-blue-50 hover:text-[#007CFF] border border-[#C5C5C5]'
                     }`}
                   >
                     {mode === 'Online' && <Video className="w-4 h-4" />}
@@ -318,11 +289,11 @@ const TherapistBookingPage = () => {
         {/* Section Divider */}
         <div className="relative mb-12">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gradient-to-r from-transparent via-gray-200 to-transparent" />
+            <div className="w-full border-t border-[#D8D8D8]" />
           </div>
           <div className="relative flex justify-center">
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-2 rounded-full">
-              <Sparkles className="w-5 h-5 text-indigo-600" />
+            <div className="bg-white px-6 py-2 rounded-full border border-[#D8D8D8]">
+              <Sparkles className="w-5 h-5 text-[#007CFF]" />
             </div>
           </div>
         </div>
@@ -334,14 +305,14 @@ const TherapistBookingPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-black mb-4">
               {filteredTherapists.length > 0 ? (
-                <>Perfect matches for <span className="text-blue-600">you</span></>
+                <>Perfect matches for <span className="text-[#007CFF]">you</span></>
               ) : (
                 'No matches found'
               )}
             </h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            <p className="text-lg text-[#777] max-w-2xl mx-auto">
               {filteredTherapists.length > 0 ? (
                 `We found ${filteredTherapists.length} licensed therapist${filteredTherapists.length === 1 ? '' : 's'} who match your preferences and wellness goals.`
               ) : (
@@ -352,15 +323,15 @@ const TherapistBookingPage = () => {
             {/* Sort Options */}
             {filteredTherapists.length > 0 && (
               <div className="flex justify-center mt-6">
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-1 shadow-lg border border-gray-100/50">
+                <div className="bg-white rounded-2xl p-1 shadow-lg border border-[#D8D8D8]">
                   {[{value: 'matchScore', label: '✨ Best Match'}, {value: 'rating', label: '⭐ Highest Rated'}, {value: 'price', label: '💰 Most Affordable'}].map(option => (
                     <button
                       key={option.value}
                       onClick={() => setSortBy(option.value)}
                       className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                         sortBy === option.value
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'text-slate-600 hover:text-blue-600'
+                          ? 'bg-[#007CFF] text-white shadow-md'
+                          : 'text-[#777] hover:text-[#007CFF]'
                       }`}
                     >
                       {option.label}
@@ -397,7 +368,6 @@ const TherapistBookingPage = () => {
                     therapist={therapist}
                     onBookingClick={handleBookingClick}
                     index={index}
-                    isModern={true}
                   />
                 </motion.div>
               ))}
@@ -409,16 +379,16 @@ const TherapistBookingPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
           >
-            <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-8">
-              <Search className="w-16 h-16 text-slate-400" />
+            <div className="w-32 h-32 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Search className="w-16 h-16 text-[#777]" />
             </div>
-            <h3 className="text-3xl font-bold text-slate-800 mb-4">No matches found</h3>
-            <p className="text-lg text-slate-600 mb-8 max-w-md mx-auto leading-relaxed">
+            <h3 className="text-3xl font-bold text-black mb-4">No matches found</h3>
+            <p className="text-lg text-[#777] mb-8 max-w-md mx-auto leading-relaxed">
               We couldn't find any therapists matching your current criteria. Try broadening your search.
             </p>
             <motion.button
               onClick={clearFilters}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+              className="bg-[#007CFF] text-white px-8 py-4 rounded-2xl font-semibold hover:bg-[#0066CC] transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -426,16 +396,15 @@ const TherapistBookingPage = () => {
             </motion.button>
           </motion.div>
         )}
-      </div>
 
-      {/* Booking Modal */}
-      <TherapistBookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-        therapist={selectedTherapist}
-        onBookingConfirm={handleBookingConfirm}
-      />
-    </div>
+        {/* Booking Modal */}
+        <TherapistBookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          therapist={selectedTherapist}
+          onBookingConfirm={handleBookingConfirm}
+        />
+      </div>
   );
 };
 

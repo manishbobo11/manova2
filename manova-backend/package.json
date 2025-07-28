@@ -1,0 +1,26 @@
+{
+  "name": "manova-backend",
+  "version": "1.0.0",
+  "description": "Manova Backend API Server",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "axios": "^1.10.0",
+    "@pinecone-database/pinecone": "^6.1.2",
+    "firebase-admin": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["manova", "backend", "api", "wellness"],
+  "author": "Manova Team",
+  "license": "MIT"
+} 

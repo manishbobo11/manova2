@@ -101,8 +101,8 @@ const WellnessGraph = ({ checkins = [] }) => {
         {
           label: 'Wellness Score',
           data: wellnessScores,
-          borderColor: 'rgb(34, 197, 94)',
-          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          borderColor: '#007CFF',
+          backgroundColor: 'rgba(0, 124, 255, 0.1)',
           fill: true,
           tension: 0.3,
           pointRadius: 4,
@@ -111,8 +111,8 @@ const WellnessGraph = ({ checkins = [] }) => {
         {
           label: 'Stress Score',
           data: stressScores,
-          borderColor: 'rgb(239, 68, 68)',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderColor: '#FF6B6B',
+          backgroundColor: 'rgba(255, 107, 107, 0.1)',
           fill: true,
           tension: 0.3,
           pointRadius: 4,
@@ -171,13 +171,13 @@ const WellnessGraph = ({ checkins = [] }) => {
   if (!checkins || checkins.length === 0) {
     return (
       <div className="relative">
-        <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-6">Wellness Trends</h3>
-        <div className="backdrop-blur-sm bg-white/20 rounded-2xl border border-white/20 p-8">
-          <div className="flex flex-col items-center justify-center h-80 text-gray-600">
-            <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+        <h3 className="text-xl font-bold text-black mb-6">Wellness Trends</h3>
+        <div className="bg-white rounded-2xl border border-[#D8D8D8] p-8">
+          <div className="flex flex-col items-center justify-center h-80 text-[#777]">
+            <div className="w-16 h-16 bg-[#007CFF] rounded-2xl flex items-center justify-center mb-6 shadow-lg">
               <Brain className="h-8 w-8 text-white" />
             </div>
-            <h4 className="text-xl font-bold mb-3 text-gray-800">No data available</h4>
+            <h4 className="text-xl font-bold mb-3 text-black">No data available</h4>
             <p className="text-center font-medium">
               Complete some check-ins to see your wellness and stress trends over time!
             </p>
@@ -190,20 +190,20 @@ const WellnessGraph = ({ checkins = [] }) => {
   return (
     <div className="relative">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Wellness Trends</h3>
-        <div className="text-sm text-gray-700 font-medium">
+        <h3 className="text-xl font-bold text-black">Wellness Trends</h3>
+        <div className="text-sm text-[#777] font-medium">
           {checkins.length} check-in{checkins.length !== 1 ? 's' : ''}
         </div>
       </div>
       
       <div className="h-80 relative">
-        <div className="absolute inset-0 backdrop-blur-sm bg-white/20 rounded-2xl border border-white/20"></div>
+        <div className="absolute inset-0 bg-white rounded-2xl border border-[#D8D8D8]"></div>
         <div className="relative z-10 h-full p-4">
           <Line data={chartData} options={chartOptions} />
         </div>
       </div>
       
-      <div className="mt-6 text-sm text-gray-600 text-center font-medium">
+      <div className="mt-6 text-sm text-[#777] text-center font-medium">
         Wellness scores are calculated from your stress responses. Higher wellness = lower stress.
       </div>
     </div>

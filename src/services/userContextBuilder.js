@@ -316,4 +316,152 @@ Respond in this JSON format:
 `;
 
   return prompt;
+}
+
+/**
+ * Gets current stress domain from recent check-ins
+ * @param {Array} surveyHistory - Array of survey responses
+ * @returns {string} Current dominant stress domain
+ */
+export function getCurrentStressDomain(surveyHistory) {
+  if (!surveyHistory || surveyHistory.length === 0) return 'General';
+  
+  // Get recent check-ins (last 5)
+  const recentCheckins = surveyHistory.slice(-5);
+  
+  // Count domain frequencies with stress level weighting
+  const domainScores = {};
+  recentCheckins.forEach(checkin => {
+    const domain = checkin.domain || 'General';
+    const stressScore = checkin.stressScore || checkin.value || 0;
+    domainScores[domain] = (domainScores[domain] || 0) + stressScore;
+  });
+  
+  // Return domain with highest weighted score
+  const sortedDomains = Object.entries(domainScores)
+    .sort(([,a], [,b]) => b - a);
+    
+  return sortedDomains.length > 0 ? sortedDomains[0][0] : 'General';
+}
+
+/**
+ * Calculates current stress level from recent check-ins
+ * @param {Array} surveyHistory - Array of survey responses
+ * @returns {string} Current stress level (Low/Moderate/High/Extreme)
+ */
+export function getCurrentStressLevel(surveyHistory) {
+  if (!surveyHistory || surveyHistory.length === 0) return 'Low';
+  
+  // Get recent check-ins (last 3)
+  const recentCheckins = surveyHistory.slice(-3);
+  
+  // Calculate average stress score
+  const avgStress = recentCheckins.reduce((sum, checkin) => {
+    return sum + (checkin.stressScore || checkin.value || 0);
+  }, 0) / recentCheckins.length;
+  
+  // Map to stress levels
+  if (avgStress >= 4) return 'Extreme';
+  if (avgStress >= 3) return 'High';
+  if (avgStress >= 2) return 'Moderate';
+  return 'Low';
+}
+
+/**
+ * Generates a summary of past check-ins using vector similarity
+ * @param {string} userId - User ID
+ * @param {string} currentMessage - Current user message
+ * @param {Function} vectorQuery - Function to query similar vectors
+ * @returns {Promise<string>} Summary of past similar check-ins
+ */
+export async function getPastCheckinSummary(userId, currentMessage, vectorQuery) {
+  try {
+    if (!vectorQuery) {
+      return 'No similar past experiences found';
+    }
+    
+    // Get embedding for current message (this would need to be implemented)
+    // For now, we'll use a simple approach
+    const similarCheckins = await vectorQuery(userId, currentMessage);
+    
+    if (!similarCheckins || similarCheckins.length === 0) {
+      return 'This seems like a new experience for you';
+    }
+    
+    // Extract patterns from similar check-ins
+    const patterns = similarCheckins.map(checkin => {
+      const metadata = checkin.metadata || {};
+      return `${metadata.domain || 'General'}: ${metadata.emotion || 'mixed emotions'}`;
+    }).slice(0, 3);
+    
+    return `You've shared similar feelings about: ${patterns.join(', ')}`;
+    
+  } catch (error) {
+    console.error('Error getting past checkin summary:', error);
+    return 'Unable to retrieve past experiences at this time';
+  }
+}
+
+/**
+ * Gets user's language preference from profile or context
+ * @param {string} userId - User ID
+ * @param {Object} userContext - User context object
+ * @returns {string} Language preference (English/Hindi/Hinglish)
+ */
+export function getLanguagePreference(userId, userContext) {
+  // Check context first
+  if (userContext?.languagePreference) {
+    return userContext.languagePreference;
+  }
+  
+  // Check user settings (would need to be implemented)
+  // For now, default to Hinglish as it's commonly preferred
+  return 'Hinglish';
+}
+
+/**
+ * Gets user's first name from profile or context
+ * @param {string} userId - User ID
+ * @param {Object} userContext - User context object
+ * @returns {string} User's first name or null
+ */
+export function getUserFirstName(userId, userContext) {
+  // Check various possible sources
+  if (userContext?.firstName) return userContext.firstName;
+  if (userContext?.name) {
+    const nameParts = userContext.name.split(' ');
+    return nameParts[0];
+  }
+  if (userContext?.displayName) {
+    const nameParts = userContext.displayName.split(' ');
+    return nameParts[0];
+  }
+  
+  return null; // No name available
+}
+
+/**
+ * Builds complete personalization context for Sarthi
+ * @param {string} userId - User ID
+ * @param {Array} surveyHistory - Survey history
+ * @param {Object} userContext - User context
+ * @param {string} currentMessage - Current user message
+ * @param {Function} vectorQuery - Vector query function
+ * @returns {Promise<Object>} Complete personalization context
+ */
+export async function buildSarthiPersonalizationContext(userId, surveyHistory, userContext, currentMessage, vectorQuery) {
+  const context = {
+    currentStressDomain: getCurrentStressDomain(surveyHistory),
+    stressLevel: getCurrentStressLevel(surveyHistory),
+    pastCheckinSummary: await getPastCheckinSummary(userId, currentMessage, vectorQuery),
+    languagePreference: getLanguagePreference(userId, userContext),
+    userFirstName: getUserFirstName(userId, userContext),
+    rawData: {
+      surveyHistory: surveyHistory?.slice(-5) || [], // Last 5 check-ins
+      userContext,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  return context;
 } 

@@ -5,219 +5,274 @@
 
 export const therapistDatabase = [
   {
-    id: 1,
+    id: "therapist-001",
     name: "Dr. Sarah Johnson",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Work Stress", "Anxiety", "Burnout Prevention"],
-    languages: ["English"],
+    avatar: "/images/therapists/sarah-johnson.jpg",
+    specializations: ["Work Stress", "Anxiety", "Burnout Recovery"],
+    languages: ["English", "Hindi"],
     mode: ["Online", "In-Person"],
     matchScore: 95,
     experience: "8 years",
     credentials: "PhD Clinical Psychology",
-    bio: "Specializes in workplace stress management and anxiety disorders. Helped over 500+ professionals overcome burnout.",
+    bio: "Dr. Sarah specializes in helping professionals manage workplace stress and anxiety. She uses evidence-based techniques like CBT and mindfulness to help clients develop healthy coping strategies.",
     rating: 4.9,
     reviewCount: 127,
     availability: {
-      timezone: "PST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["09:00", "11:00", "14:00", "16:00"] },
-        { date: "2024-01-16", times: ["10:00", "13:00", "15:00"] },
-        { date: "2024-01-17", times: ["09:00", "11:00", "14:00", "16:00", "17:00"] }
+        { date: "2025-01-28", times: ["10:00", "14:00", "16:00"] },
+        { date: "2025-01-29", times: ["11:00", "15:00", "17:00"] },
+        { date: "2025-01-30", times: ["09:00", "13:00", "16:00"] }
       ]
     },
     pricing: {
-      online: 2500, // ₹2500 per session
-      inPerson: 3500 // ₹3500 per session
+      online: 2500,
+      inPerson: 3000
     },
-    location: "San Francisco, CA"
+    location: "Mumbai, Maharashtra"
   },
   {
-    id: 2,
+    id: "therapist-002",
     name: "Dr. Raj Patel",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Relationships", "Family Therapy", "Cultural Issues"],
+    avatar: "/images/therapists/raj-patel.jpg",
+    specializations: ["Relationships", "Family Therapy", "Couples Therapy"],
     languages: ["English", "Hindi", "Gujarati"],
     mode: ["Online", "In-Person"],
     matchScore: 92,
     experience: "12 years",
-    credentials: "MD Psychiatry, Family Therapy Certified",
-    bio: "Expert in relationship counseling and family dynamics with deep understanding of cultural contexts.",
+    credentials: "MD Psychiatry",
+    bio: "Dr. Raj is an expert in relationship counseling and family dynamics. He helps couples and families navigate communication challenges and build stronger connections.",
     rating: 4.8,
-    reviewCount: 203,
+    reviewCount: 89,
     availability: {
-      timezone: "EST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["10:00", "12:00", "15:00"] },
-        { date: "2024-01-16", times: ["09:00", "11:00", "14:00", "16:00"] },
-        { date: "2024-01-18", times: ["10:00", "13:00", "15:00", "17:00"] }
+        { date: "2025-01-28", times: ["09:00", "13:00", "18:00"] },
+        { date: "2025-01-29", times: ["10:00", "14:00", "19:00"] },
+        { date: "2025-01-30", times: ["11:00", "15:00", "17:00"] }
       ]
     },
     pricing: {
-      online: 2200, // ₹2200 per session
-      inPerson: 3200 // ₹3200 per session
+      online: 3000,
+      inPerson: 3500
     },
-    location: "New York, NY"
+    location: "Delhi, NCR"
   },
   {
-    id: 3,
+    id: "therapist-003",
     name: "Dr. Priya Sharma",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Health Anxiety", "Chronic Illness", "Medical Trauma"],
+    avatar: "/images/therapists/priya-sharma.jpg",
+    specializations: ["Health Anxiety", "Medical Stress", "Chronic Illness Support"],
     languages: ["English", "Hindi"],
     mode: ["Online"],
     matchScore: 88,
     experience: "6 years",
-    credentials: "PsyD Clinical Health Psychology",
-    bio: "Compassionate specialist in health-related anxiety and chronic illness support with holistic approach.",
-    rating: 4.9,
-    reviewCount: 89,
+    credentials: "PsyD Health Psychology",
+    bio: "Dr. Priya specializes in health psychology and supports individuals dealing with medical anxiety, chronic conditions, and health-related stress.",
+    rating: 4.7,
+    reviewCount: 64,
     availability: {
-      timezone: "PST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["11:00", "13:00", "16:00"] },
-        { date: "2024-01-17", times: ["09:00", "12:00", "14:00", "17:00"] },
-        { date: "2024-01-19", times: ["10:00", "13:00", "15:00"] }
+        { date: "2025-01-28", times: ["11:00", "15:00", "17:00"] },
+        { date: "2025-01-29", times: ["12:00", "16:00", "18:00"] },
+        { date: "2025-01-30", times: ["10:00", "14:00", "16:00"] }
       ]
     },
     pricing: {
-      online: 2000 // ₹2000 per session
+      online: 2200,
+      inPerson: 2800
     },
-    location: "Los Angeles, CA"
+    location: "Bangalore, Karnataka"
   },
   {
-    id: 4,
+    id: "therapist-004",
     name: "Dr. Michael Chen",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Academic Stress", "Career Transition", "Performance Anxiety"],
-    languages: ["English", "Mandarin"],
+    avatar: "/images/therapists/michael-chen.jpg",
+    specializations: ["Academic Stress", "Performance Anxiety", "Student Counseling"],
+    languages: ["English"],
     mode: ["Online", "In-Person"],
     matchScore: 85,
     experience: "10 years",
     credentials: "PhD Counseling Psychology",
-    bio: "Dedicated to helping students and professionals navigate academic and career challenges with confidence.",
-    rating: 4.7,
-    reviewCount: 156,
+    bio: "Dr. Michael focuses on academic pressure and performance anxiety. He helps students and professionals overcome perfectionism and develop healthy achievement strategies.",
+    rating: 4.9,
+    reviewCount: 103,
     availability: {
-      timezone: "PST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-16", times: ["09:00", "11:00", "15:00", "17:00"] },
-        { date: "2024-01-17", times: ["10:00", "13:00", "16:00"] },
-        { date: "2024-01-18", times: ["09:00", "12:00", "14:00", "16:00"] }
+        { date: "2025-01-28", times: ["10:00", "14:00", "16:00"] },
+        { date: "2025-01-29", times: ["11:00", "15:00", "17:00"] },
+        { date: "2025-01-30", times: ["09:00", "13:00", "18:00"] }
       ]
     },
     pricing: {
-      online: 2300, // ₹2300 per session
-      inPerson: 3300 // ₹3300 per session
+      online: 2800,
+      inPerson: 3200
     },
-    location: "Seattle, WA"
+    location: "Pune, Maharashtra"
   },
   {
-    id: 5,
+    id: "therapist-005",
     name: "Dr. Anita Gupta",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Mindfulness", "General Wellness", "Stress Management"],
-    languages: ["English", "Hindi", "Punjabi"],
-    mode: ["Online", "In-Person"],
+    avatar: "/images/therapists/anita-gupta.jpg",
+    specializations: ["Mindfulness", "General Wellness", "Stress Reduction"],
+    languages: ["English", "Hindi"],
+    mode: ["Online"],
     matchScore: 90,
     experience: "15 years",
-    credentials: "PhD Clinical Psychology, Mindfulness Certified",
-    bio: "Integrative therapist combining evidence-based therapy with mindfulness practices for holistic healing.",
-    rating: 4.9,
-    reviewCount: 234,
+    credentials: "PhD Clinical Psychology",
+    bio: "Dr. Anita combines traditional therapy with mindfulness-based approaches. She specializes in general wellness and helps clients develop sustainable stress management practices.",
+    rating: 4.8,
+    reviewCount: 145,
     availability: {
-      timezone: "EST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["08:00", "10:00", "13:00", "15:00"] },
-        { date: "2024-01-16", times: ["09:00", "11:00", "14:00"] },
-        { date: "2024-01-17", times: ["08:00", "12:00", "16:00", "17:00"] }
+        { date: "2025-01-28", times: ["09:00", "13:00", "17:00"] },
+        { date: "2025-01-29", times: ["10:00", "14:00", "18:00"] },
+        { date: "2025-01-30", times: ["11:00", "15:00", "16:00"] }
       ]
     },
     pricing: {
-      online: 2600, // ₹2600 per session
-      inPerson: 3600 // ₹3600 per session
+      online: 2600,
+      inPerson: 3100
     },
-    location: "Boston, MA"
+    location: "Chennai, Tamil Nadu"
   },
   {
-    id: 6,
-    name: "Dr. Emily Rodriguez",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Trauma Recovery", "PTSD", "Emotional Regulation"],
-    languages: ["English", "Spanish"],
+    id: "therapist-006",
+    name: "Dr. Kavya Menon",
+    avatar: "/images/therapists/kavya-menon.jpg",
+    specializations: ["Depression", "Mood Disorders", "Emotional Regulation"],
+    languages: ["English", "Malayalam", "Hindi"],
     mode: ["Online", "In-Person"],
     matchScore: 93,
     experience: "9 years",
-    credentials: "PhD Clinical Psychology, EMDR Certified",
-    bio: "Trauma-informed therapist specializing in PTSD recovery using EMDR and cognitive-behavioral approaches.",
-    rating: 4.8,
-    reviewCount: 178,
+    credentials: "MD Psychiatry",
+    bio: "Dr. Kavya specializes in mood disorders and depression treatment. She uses a compassionate approach combining medication management with psychotherapy when needed.",
+    rating: 4.9,
+    reviewCount: 78,
     availability: {
-      timezone: "CST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["09:00", "12:00", "14:00", "16:00"] },
-        { date: "2024-01-17", times: ["10:00", "13:00", "15:00"] },
-        { date: "2024-01-18", times: ["09:00", "11:00", "14:00", "17:00"] }
+        { date: "2025-01-28", times: ["11:00", "15:00", "18:00"] },
+        { date: "2025-01-29", times: ["12:00", "16:00", "19:00"] },
+        { date: "2025-01-30", times: ["10:00", "14:00", "17:00"] }
       ]
     },
     pricing: {
-      online: 2700, // ₹2700 per session
-      inPerson: 3700 // ₹3700 per session
+      online: 3200,
+      inPerson: 3800
     },
-    location: "Austin, TX"
+    location: "Kochi, Kerala"
   },
   {
-    id: 7,
-    name: "Dr. James Wilson",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Depression", "Mood Disorders", "Life Transitions"],
-    languages: ["English"],
+    id: "therapist-007",
+    name: "Dr. Arjun Singh",
+    avatar: "/images/therapists/arjun-singh.jpg",
+    specializations: ["Trauma Recovery", "PTSD", "Crisis Intervention"],
+    languages: ["English", "Hindi", "Punjabi"],
     mode: ["Online", "In-Person"],
     matchScore: 87,
     experience: "11 years",
-    credentials: "MD Psychiatry, CBT Certified",
-    bio: "Compassionate psychiatrist with expertise in mood disorders and life transition support.",
-    rating: 4.6,
-    reviewCount: 142,
+    credentials: "PhD Clinical Psychology",
+    bio: "Dr. Arjun specializes in trauma recovery and PTSD treatment. He provides a safe space for individuals to process difficult experiences and develop healing strategies.",
+    rating: 4.7,
+    reviewCount: 56,
     availability: {
-      timezone: "EST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-16", times: ["10:00", "12:00", "15:00", "17:00"] },
-        { date: "2024-01-17", times: ["09:00", "13:00", "16:00"] },
-        { date: "2024-01-19", times: ["10:00", "14:00", "16:00"] }
+        { date: "2025-01-28", times: ["10:00", "14:00", "17:00"] },
+        { date: "2025-01-29", times: ["11:00", "15:00", "18:00"] },
+        { date: "2025-01-30", times: ["09:00", "13:00", "16:00"] }
       ]
     },
     pricing: {
-      online: 2800, // ₹2800 per session
-      inPerson: 3800 // ₹3800 per session
+      online: 3500,
+      inPerson: 4000
     },
-    location: "Miami, FL"
+    location: "Chandigarh, Punjab"
   },
   {
-    id: 8,
-    name: "Dr. Lisa Thompson",
-    avatar: "/images/default-avatar.svg",
-    specializations: ["Couples Therapy", "Communication", "Relationship Issues"],
-    languages: ["English", "French"],
-    mode: ["Online", "In-Person"],
+    id: "therapist-008",
+    name: "Dr. Meera Reddy",
+    avatar: "/images/therapists/meera-reddy.jpg",
+    specializations: ["Anxiety", "Social Anxiety", "Panic Disorders"],
+    languages: ["English", "Telugu", "Hindi"],
+    mode: ["Online"],
     matchScore: 91,
-    experience: "13 years",
-    credentials: "PhD Marriage & Family Therapy",
-    bio: "Relationship expert helping couples build stronger connections through improved communication.",
-    rating: 4.9,
-    reviewCount: 267,
+    experience: "7 years",
+    credentials: "MSc Counseling Psychology",
+    bio: "Dr. Meera focuses on anxiety disorders and panic management. She helps clients understand their anxiety triggers and develop effective coping mechanisms.",
+    rating: 4.8,
+    reviewCount: 92,
     availability: {
-      timezone: "PST",
+      timezone: "Asia/Kolkata",
       slots: [
-        { date: "2024-01-15", times: ["11:00", "14:00", "16:00"] },
-        { date: "2024-01-16", times: ["09:00", "12:00", "15:00", "17:00"] },
-        { date: "2024-01-18", times: ["10:00", "13:00", "16:00"] }
+        { date: "2025-01-28", times: ["09:00", "13:00", "16:00"] },
+        { date: "2025-01-29", times: ["10:00", "14:00", "17:00"] },
+        { date: "2025-01-30", times: ["11:00", "15:00", "18:00"] }
       ]
     },
     pricing: {
-      online: 2750, // ₹2750 per session
-      inPerson: 3750 // ₹3750 per session
+      online: 2400,
+      inPerson: 2900
     },
-    location: "Portland, OR"
+    location: "Hyderabad, Telangana"
+  },
+  {
+    id: "therapist-009",
+    name: "Dr. Rohit Kumar",
+    avatar: "/images/therapists/rohit-kumar.jpg",
+    specializations: ["Work Stress", "Career Counseling", "Life Transitions"],
+    languages: ["English", "Hindi"],
+    mode: ["Online", "In-Person"],
+    matchScore: 86,
+    experience: "13 years",
+    credentials: "PhD Psychology",
+    bio: "Dr. Rohit helps professionals navigate career challenges and life transitions. He specializes in work-life balance and career development counseling.",
+    rating: 4.6,
+    reviewCount: 71,
+    availability: {
+      timezone: "Asia/Kolkata",
+      slots: [
+        { date: "2025-01-28", times: ["11:00", "15:00", "18:00"] },
+        { date: "2025-01-29", times: ["12:00", "16:00", "19:00"] },
+        { date: "2025-01-30", times: ["10:00", "14:00", "17:00"] }
+      ]
+    },
+    pricing: {
+      online: 2700,
+      inPerson: 3300
+    },
+    location: "Gurgaon, Haryana"
+  },
+  {
+    id: "therapist-010",
+    name: "Dr. Neha Joshi",
+    avatar: "/images/therapists/neha-joshi.jpg",
+    specializations: ["Family Therapy", "Parenting Support", "Child Psychology"],
+    languages: ["English", "Hindi", "Marathi"],
+    mode: ["Online", "In-Person"],
+    matchScore: 89,
+    experience: "8 years",
+    credentials: "MSc Clinical Psychology",
+    bio: "Dr. Neha works with families and parents to improve communication and resolve conflicts. She specializes in family dynamics and child behavioral issues.",
+    rating: 4.7,
+    reviewCount: 84,
+    availability: {
+      timezone: "Asia/Kolkata",
+      slots: [
+        { date: "2025-01-28", times: ["10:00", "14:00", "17:00"] },
+        { date: "2025-01-29", times: ["11:00", "15:00", "18:00"] },
+        { date: "2025-01-30", times: ["09:00", "13:00", "16:00"] }
+      ]
+    },
+    pricing: {
+      online: 2500,
+      inPerson: 3000
+    },
+    location: "Nashik, Maharashtra"
   }
 ];
 
@@ -239,9 +294,9 @@ export const filterOptions = {
     "All Languages",
     "English",
     "Hindi", 
-    "Spanish",
-    "Mandarin",
-    "French",
+    "Telugu",
+    "Malayalam",
+    "Marathi",
     "Gujarati",
     "Punjabi"
   ],
