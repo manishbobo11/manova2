@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import { apiFetch } from '../utils/api';
 
 // Custom styles for react-select
 const selectStyles = {
@@ -87,15 +88,10 @@ const DeepDiveUI = ({
         // Try to fetch dynamic contributors from API based on question ID
         if (questionId) {
           console.log(`🔍 Fetching dynamic contributors for question: ${questionId}`);
-          const res = await fetch(`http://localhost:8001/api/contributors?qid=${questionId}`);
-          if (res.ok) {
-            const data = await res.json();
-            console.log(`✅ Received ${data.length} dynamic contributors for ${questionId}`);
-            setOptions(data);
-          } else {
-            console.log(`⚠️ API returned ${res.status}, falling back to provided options`);
-            setOptions(stressOptions);
-          }
+          const res = await apiFetch(`/api/contributors?qid=${questionId}`);
+          const data = await res.json();
+          console.log(`✅ Received ${data.length} dynamic contributors for ${questionId}`);
+          setOptions(data);
         } else {
           // Use provided stressOptions if no questionId
           console.log('📋 Using provided stress options (no question ID)');

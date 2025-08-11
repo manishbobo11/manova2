@@ -7,6 +7,7 @@ import { getCheckinHistory } from '../userSurveyHistory.js';
 import { ContextStore } from '../firebase.js';
 import { querySimilarVectors } from '../../utils/vectorStore.js';
 import { createUltimatePersonalizedSarthiPrompt } from './ultimatePersonalizedSarthiPrompt.js';
+import { apiFetch } from '../../utils/api';
 
 // 🧠 Context Aggregation Functions for Sarthi
 /**
@@ -627,11 +628,8 @@ export const generateSarthiResponse = async (userId, userMessage, languagePrefer
     const ultimateSarthiPrompt = createUltimatePersonalizedSarthiPrompt(userMessage, context);
     
     // Call Azure GPT-4o with ultimate personalized Sarthi prompt
-    const response = await fetch('http://localhost:8001/api/openai-chat', {
+    const response = await apiFetch('/api/openai-chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         prompt: ultimateSarthiPrompt,
         userId: userId
@@ -858,9 +856,8 @@ Respond as a human therapist would:
 `;
 
   try {
-    const response = await fetch("/api/gptTherapist", {
+    const response = await apiFetch("/api/gptTherapist", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         domain,
         stressSignals: selectedTriggers.join(", "),
@@ -1091,11 +1088,8 @@ Analyze both content and tone of the answer. Focus on emotional signals, intensi
   try {
     // Call Azure GPT-4o for enhanced psychological analysis
     console.log('📡 Calling Azure GPT-4o for stress analysis...');
-    const response = await fetch('http://localhost:8001/api/openai-chat', {
+    const response = await apiFetch('/api/openai-chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         prompt: enhancedPrompt
       }),
@@ -1241,11 +1235,8 @@ Output format:
 
   try {
     // Use the server API for therapeutic insights
-    const response = await fetch('http://localhost:8001/api/openai-chat', {
+    const response = await apiFetch('/api/openai-chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         prompt: prompt
       }),

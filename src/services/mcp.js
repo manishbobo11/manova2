@@ -2,6 +2,7 @@ import { ContextStore } from './firebase';
 import { toFirestoreSafe } from '../utils/firestoreSafe';
 import { getCheckinHistory } from './userSurveyHistory';
 import { contextualMemoryBuilder } from './userContextBuilder';
+import { apiFetch } from '../utils/api';
 
 function getDeepDivePrompt(domain, answers) {
   const context = answers.map(a => `Q: ${a.id}, Score: ${a.answer}`).join('\n');
@@ -49,11 +50,8 @@ class MCPService {
       throw new Error('Prompt must be a valid non-empty string');
     }
 
-    const response = await fetch('/api/openai-chat', {
+    const response = await apiFetch('/api/openai-chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ prompt }),
     });
 

@@ -8,6 +8,7 @@ import AgenticAI from './AgenticAI';
 import { getUserEmotionalHistory as getVectorHistory } from '../../utils/vectorStore';
 import { DeepConversationEngine } from './deepConversationEngine';
 import { getAdaptiveLanguageContext, detectMessageLanguage, getLanguageInstruction } from '../../utils/languageDetection';
+import { apiFetch } from '../../utils/api';
 
 export class ChatEngine {
   constructor() {
@@ -1070,11 +1071,8 @@ Respond now as Sarthi to ${displayName}:`;
       }
 
       // Call our backend API with strict language enforcement
-      const apiResponse = await fetch('/api/gpt', {
+      const apiResponse = await apiFetch('/api/gpt', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           messages,
           sessionLanguage,

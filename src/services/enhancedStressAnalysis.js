@@ -3,6 +3,8 @@
  * Provides per-question stress analysis with detailed emotional and contextual insights
  */
 
+import { apiFetch } from '../utils/api';
+
 /**
  * Analyze individual survey question response for stress indicators
  * @param {string} question - The survey question text
@@ -16,11 +18,8 @@ export async function analyzeQuestionStress(question, answer, domain, questionId
     console.log(`🔍 Analyzing stress for question ${questionId}:`, { question, answer, domain });
     
     // Call enhanced stress analysis API
-    const response = await fetch('/api/enhanced-stress-analysis', {
+    const response = await apiFetch('/api/enhanced-stress-analysis', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         questionId,
         responseText: answer,

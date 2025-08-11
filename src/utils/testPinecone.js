@@ -1,6 +1,8 @@
 /**
  * Test Pinecone connection with the configured credentials
  */
+
+import { apiFetch } from './api';
 export const testPineconeConnection = async () => {
   console.log('🧪 Testing Pinecone connection...');
   
@@ -15,11 +17,8 @@ export const testPineconeConnection = async () => {
     
     console.log('📡 Testing vector upsert to Pinecone...');
     
-    const response = await fetch('http://localhost:8001/api/vector/upsert', {
+    const response = await apiFetch('/api/vector/upsert', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         userId: 'test-user-pinecone',
         embedding: testEmbedding,

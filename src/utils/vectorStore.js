@@ -3,7 +3,7 @@
  * This avoids browser compatibility issues with the Pinecone client
  */
 
-const API_BASE_URL = import.meta.env.VITE_VECTOR_API_BASE_URL || 'http://localhost:8001/api/vector';
+import { apiFetch } from './api';
 
 /**
  * Upsert a user's emotional vector into Pinecone
@@ -20,21 +20,10 @@ const API_BASE_URL = import.meta.env.VITE_VECTOR_API_BASE_URL || 'http://localho
 export const upsertUserVector = async (userId, embedding, metadata = {}) => {
   try {
     console.log(`📝 Upserting vector for user ${userId} via API`);
-    console.log(`🔗 API URL: ${API_BASE_URL}/upsert`);
+    console.log(`🔗 API URL: /api/vector/upsert`);
     
-    // Check if we should attempt API call
-    const shouldAttemptAPI = API_BASE_URL && !API_BASE_URL.includes('localhost');
-    
-    if (!shouldAttemptAPI) {
-      console.log('🔧 Using localhost vector API - attempting connection...');
-      // Don't skip localhost entirely, attempt the call but handle gracefully
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/upsert`, {
+    const response = await apiFetch(`/api/vector/upsert`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         userId,
         embedding,
@@ -117,16 +106,8 @@ export const upsertUserVector = async (userId, embedding, metadata = {}) => {
 export const querySimilarVectors = async (userId, embedding, topK = 3) => {
   try {
     console.log(`🔍 Querying similar vectors for user ${userId} via API`);
-    console.log(`🔗 API URL: ${API_BASE_URL}/query`);
+    console.log(`🔗 API URL: /api/vector/query`);
     console.log(`📊 Request params: userId=${userId}, topK=${topK}, embeddingLength=${embedding?.length}`);
-    
-    // Check if we should attempt API call
-    const shouldAttemptAPI = API_BASE_URL && !API_BASE_URL.includes('localhost');
-    
-    if (!shouldAttemptAPI) {
-      console.log('🔧 Using localhost vector API - attempting connection...');
-      // Don't skip localhost entirely, attempt the call but handle gracefully
-    }
     
     // Validate inputs
     if (!userId || typeof userId !== 'string') {
@@ -147,11 +128,8 @@ export const querySimilarVectors = async (userId, embedding, topK = 3) => {
     };
     
     console.log('📤 Sending request to vector API...');
-    const response = await fetch(`${API_BASE_URL}/query`, {
+    const response = await apiFetch(`/api/vector/query`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(requestBody)
     });
 
@@ -244,19 +222,10 @@ export const getUserEmotionalHistory = async (userId, limit = 10) => {
   try {
     console.log(`📊 Retrieving emotional history for user ${userId} via API`);
     
-    // Check if we should attempt API call
-    const shouldAttemptAPI = API_BASE_URL && !API_BASE_URL.includes('localhost');
+
     
-    if (!shouldAttemptAPI) {
-      console.log('🔧 Using localhost vector API - attempting connection...');
-      // Don't skip localhost entirely, attempt the call but handle gracefully
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/query`, {
+    const response = await apiFetch(`/api/vector/query`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         userId,
         topK: limit,
@@ -367,134 +336,22 @@ export const resetVectorContext = async (userId) => {
   try {
     console.log(`🔄 Resetting vector context for user ${userId}`);
     
-    // Check if we should attempt API call
-    const shouldAttemptAPI = API_BASE_URL && !API_BASE_URL.includes('localhost');
+    // Note: Reset endpoint is not implemented in the backend yet
+    // For now, we'll just log and return success
+    console.log('🔧 Vector reset endpoint not implemented yet, skipping reset');
     
-    if (!shouldAttemptAPI) {
-      console.log('🔧 Using localhost vector API - attempting connection...');
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/reset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        operation: 'reset_context'
-      })
-    });
-
-    // Check if response is JSON before trying to parse it
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.warn(`⚠️ Vector reset API returned non-JSON response (${contentType})`);
-      
-      // If it's a 404, the endpoint doesn't exist
-      if (response.status === 404) {
-        console.log('🔧 Vector reset endpoint not available (404), continuing without vector reset');
-        return { 
-          success: true, 
-          message: 'Vector reset endpoint not available, continuing with session reset',
-          skipped: true
-        };
-      }
-      
-      // If it's HTML (likely an error page), log and continue gracefully
-      if (contentType && contentType.includes('text/html')) {
-        console.log('🔧 Vector reset endpoint returned HTML (likely error page), continuing without vector reset');
-        return { 
-          success: true, 
-          message: 'Vector reset endpoint not available, continuing with session reset',
-          skipped: true
-        };
-      }
-      
-      // For other non-JSON responses, continue gracefully
-      return { 
-        success: true, 
-        message: 'Vector reset endpoint not available, continuing with session reset',
-        skipped: true
-      };
-    }
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.warn('⚠️ Failed to parse JSON response from vector reset API:', parseError);
-      return { 
-        success: true, 
-        message: 'Vector reset endpoint not available, continuing with session reset',
-        skipped: true
-      };
-    }
-
-    if (!response.ok) {
-      console.warn(`⚠️ Vector reset API error (${response.status}): ${data.error || 'Unknown error'}`);
-      
-      // If endpoint doesn't exist (404), log and continue gracefully
-      if (response.status === 404) {
-        console.log('🔧 Vector reset endpoint not available yet, continuing without vector reset');
-        return { 
-          success: true, 
-          message: 'Vector reset endpoint not available, continuing with session reset',
-          skipped: true
-        };
-      }
-      
-      // Don't throw error, just log and continue
-      return { 
-        success: false, 
-        error: data.error || `HTTP ${response.status}`,
-        message: 'Vector reset failed, but continuing with session reset'
-      };
-    }
-
-    if (data.success === false) {
-      console.warn('⚠️ Vector reset API returned success: false:', data.error || 'Unknown error');
-      return { 
-        success: false, 
-        error: data.error || 'Unknown error',
-        message: 'Vector reset failed, but continuing with session reset'
-      };
-    }
-    
-    console.log(`✅ Vector context reset successfully for user ${userId}`);
     return {
       success: true,
-      message: 'Vector context cleared',
-      deletedCount: data.deletedCount || 0
+      message: 'Vector reset not implemented yet, continuing with session reset',
+      skipped: true
     };
     
   } catch (error) {
     console.error('❌ Error resetting vector context:', error);
-    
-    // If it's a network error or endpoint doesn't exist, continue gracefully
-    if (error.name === 'TypeError' || error.message.includes('fetch')) {
-      console.log('🔧 Vector reset endpoint not available, continuing without vector reset');
-      return { 
-        success: true, 
-        message: 'Vector reset endpoint not available, continuing with session reset',
-        skipped: true
-      };
-    }
-    
-    // If it's a JSON parse error (likely HTML response), continue gracefully
-    if (error.name === 'SyntaxError' && error.message.includes('Unexpected token')) {
-      console.log('🔧 Vector reset endpoint returned invalid JSON (likely HTML), continuing without vector reset');
-      return { 
-        success: true, 
-        message: 'Vector reset endpoint not available, continuing with session reset',
-        skipped: true
-      };
-    }
-    
-    // Don't throw error to avoid breaking the flow
     return { 
-      success: false, 
-      error: error.message,
-      message: 'Vector reset failed, but continuing with session reset'
+      success: true, 
+      message: 'Vector reset failed, continuing with session reset',
+      skipped: true
     };
   }
 };

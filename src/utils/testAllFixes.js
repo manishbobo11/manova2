@@ -1,5 +1,6 @@
 import { getEmbeddingFromAzure } from './embeddingService.js';
 import { AZURE_CONFIG, validateAzureConfig } from '../config/config.js';
+import { apiFetch } from './api';
 
 /**
  * Comprehensive test for all Manova fixes
@@ -42,11 +43,8 @@ export const testAllFixes = async () => {
     // Test 3: Enhanced Stress Analysis API
     console.log('\n3️⃣ Testing enhanced stress analysis API...');
     try {
-      const response = await fetch('/api/enhanced-stress-analysis', {
+      const response = await apiFetch('/api/enhanced-stress-analysis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           questionId: 'test-1',
           responseText: 'I feel overwhelmed with work lately',
@@ -75,11 +73,8 @@ export const testAllFixes = async () => {
     console.log('\n4️⃣ Testing vector storage API...');
     try {
       const testEmbedding = new Array(1536).fill(0.1);
-      const response = await fetch('http://localhost:8001/api/vector/upsert', {
+      const response = await apiFetch('/api/vector/upsert', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           userId: 'test-user',
           embedding: testEmbedding,

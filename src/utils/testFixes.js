@@ -1,5 +1,6 @@
 import { getEmbeddingFromAzure } from './embeddingService.js';
 import { AZURE_CONFIG, validateAzureConfig } from '../config/azure.js';
+import { apiFetch } from './api';
 
 /**
  * Test the fixes for embedding service and API endpoints
@@ -31,11 +32,8 @@ export const testFixes = async () => {
     // Test 3: API Endpoint (if running locally)
     console.log('3️⃣ Testing enhanced stress analysis API...');
     try {
-      const response = await fetch('/api/enhanced-stress-analysis', {
+      const response = await apiFetch('/api/enhanced-stress-analysis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           questionId: 'test-1',
           responseText: 'I feel overwhelmed with work lately',

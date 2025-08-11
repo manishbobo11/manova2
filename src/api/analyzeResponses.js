@@ -1,7 +1,8 @@
+import { apiFetch } from '../utils/api';
+
 export const analyzeResponses = async (responses) => {
-  const res = await fetch('http://localhost:3001/api/analyze', {
+  const res = await apiFetch('/api/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(responses)
   });
 
