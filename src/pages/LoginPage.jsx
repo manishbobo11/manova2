@@ -221,7 +221,7 @@ const LoginPage = () => {
                   transition={{ duration: 0.8, ease: 'easeOut' }}
                   className="flex justify-center items-center mb-6"
                 >
-                  <h1 className="text-5xl italic font-script text-[#1e3a8a] text-center">
+                  <h1 className="text-[48px] font-brand text-primary text-center mb-6">
                     Manova
                   </h1>
                 </motion.div>

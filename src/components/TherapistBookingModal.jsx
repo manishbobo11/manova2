@@ -315,7 +315,7 @@ const TherapistBookingModal = ({
                               disabled={!dateData.available}
                               className={`flex-shrink-0 min-w-[100px] p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
                                 selectedDate?.dateStr === dateData.dateStr
-                                  ? 'bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105'
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg transform scale-105'
                                   : dateData.available
                                   ? 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
                                   : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
@@ -346,7 +346,7 @@ const TherapistBookingModal = ({
                             disabled={!dateData.available}
                             className={`p-4 rounded-2xl border-2 text-center transition-all duration-200 ${
                               selectedDate?.dateStr === dateData.dateStr
-                                ? 'bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-lg transform scale-105'
                                 : dateData.available
                                 ? 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
                                 : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
@@ -387,7 +387,7 @@ const TherapistBookingModal = ({
                               onClick={() => handleTimeSelect(time)}
                               className={`p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
                                 selectedTime === time
-                                  ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md transform scale-105'
+                                  ? 'border-blue-600 bg-blue-600 text-white shadow-md transform scale-105'
                                   : 'border-gray-200 hover:border-blue-300 text-gray-700 hover:bg-blue-50 shadow-sm'
                               }`}
                             >
@@ -544,7 +544,7 @@ const TherapistBookingModal = ({
                   {step > 1 ? (
                     <motion.button
                       onClick={handleBack}
-                      className="flex items-center space-x-2 px-6 py-3 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                      className="flex items-center space-x-2 px-6 py-3 text-gray-700 hover:text-gray-900 font-medium transition-colors"
                       whileHover={{ x: -5 }}
                     >
                       <ArrowLeft className="w-4 h-4" />

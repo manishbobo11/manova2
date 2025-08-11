@@ -26,7 +26,7 @@ export default {
           800: "#12177a",
           850: "#0e125e",
           900: "#0a0d42",
-          DEFAULT: "#636AE8"
+          DEFAULT: "#1E2A78"
         },
         secondary: {
           100: "#fdf1f5",
@@ -263,7 +263,8 @@ export default {
         body: ["Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
         script: ["Dancing Script", "Pacifico", "cursive"],
-        brand: ["Pacifico", "cursive"],
+        brand: ['"Great Vibes"', "cursive"],
+        logo: ['"Great Vibes"', "cursive"],
       },
       animation: {
         "float-slow": "float-slow 6s ease-in-out infinite",

@@ -88,9 +88,9 @@ const ChatInput = memo(({
         <button
           onClick={handleSendMessage}
           disabled={!canSend}
-          className={`p-3 rounded-lg transition-all duration-200 ${
+          className={`p-3 rounded-lg font-medium transition-all duration-200 ${
             canSend
-              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'
+              ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white shadow-md'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >

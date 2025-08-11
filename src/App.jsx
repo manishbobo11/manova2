@@ -16,6 +16,7 @@ import SignupPage from './pages/SignupPage';
 import AboutPage from './pages/AboutPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import SupportPage from './pages/SupportPage';
+import HelpPage from './pages/HelpPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import AccessibilityPage from './pages/AccessibilityPage';
@@ -34,7 +35,13 @@ import SarthiChatbotDemo from './components/SarthiChatbotDemo';
 import TherapistBookingPage from './pages/TherapistBookingPage';
 import SleepPage from './pages/SleepPage';
 import BreathingPage from './pages/BreathingPage';
+import GratitudePage from './pages/GratitudePage';
+import JournalPage from './pages/JournalPage';
+import NatureSoundsPage from './pages/NatureSoundsPage';
+import SleepStoriesPage from './pages/SleepStoriesPage';
 import AssessmentHistory from './components/AssessmentHistory';
+import DetailsPage from './pages/DetailsPage';
+import SurveyInsight from './pages/SurveyInsight';
 
 const App = () => {
   // In a real app, this would come from your authentication system
@@ -53,6 +60,7 @@ const App = () => {
                 <Route path="/about" element={<AppLayout><AboutPage /></AppLayout>} />
                 <Route path="/how-it-works" element={<AppLayout><HowItWorksPage /></AppLayout>} />
                 <Route path="/support" element={<AppLayout><SupportPage /></AppLayout>} />
+                <Route path="/help" element={<AppLayout><HelpPage /></AppLayout>} />
                 <Route path="/privacy" element={<AppLayout><PrivacyPage /></AppLayout>} />
                 <Route path="/terms" element={<AppLayout><TermsPage /></AppLayout>} />
                 <Route path="/accessibility" element={<AppLayout><AccessibilityPage /></AppLayout>} />
@@ -97,6 +105,54 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AppLayout><BreathingPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/breathing"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><BreathingPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/gratitude"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><GratitudePage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/journal"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><JournalPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/nature-sounds"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><NatureSoundsPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/sleep-stories"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><SleepStoriesPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/meditation"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><MeditationPage /></AppLayout>
                     </ProtectedRoute>
                   }
                 />
@@ -185,6 +241,22 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AppLayout><AssessmentHistory /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/details"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><DetailsPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/survey-insight"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><SurveyInsight /></AppLayout>
                     </ProtectedRoute>
                   }
                 />

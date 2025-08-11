@@ -221,7 +221,7 @@ const BreathingPage = () => {
             </h3>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
                   <span className="text-2xl">🧘</span>
                 </div>
                 <h4 className="text-[18px] font-bold font-inter text-black mb-2">Reduces Stress</h4>

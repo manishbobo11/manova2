@@ -1,12 +1,13 @@
 import { AZURE_CONFIG, validateAzureConfig } from '../../config/azure';
 import { ContextStore } from '../firebase';
 import { querySimilarVectors, getUserEmotionalHistory } from '../../utils/vectorStore';
-import { getCheckinHistory } from '../userSurveyHistory';
+import { getCheckinHistory, getLastCheckin } from '../userSurveyHistory';
 import { buildSarthiPersonalizationContext } from '../userContextBuilder';
 import { generateSarthiResponse, aggregateUserContext } from './manovaAgent';
 import AgenticAI from './AgenticAI';
 import { getUserEmotionalHistory as getVectorHistory } from '../../utils/vectorStore';
 import { DeepConversationEngine } from './deepConversationEngine';
+import { getAdaptiveLanguageContext, detectMessageLanguage, getLanguageInstruction } from '../../utils/languageDetection';
 
 export class ChatEngine {
   constructor() {
@@ -30,16 +31,20 @@ export class ChatEngine {
     }
   }
 
-  async generateResponse({ userMessage, userId, language = 'English', conversationHistory = [] }) {
+  async generateResponse({ userMessage, userId, language = 'English', conversationHistory = [], userContext = null, languageSwitchRequest = null, firstName = null }) {
     try {
       console.log(`🧠 Sarthi AI: Processing emotional intelligence response...`);
+      console.info('[Sarthi API] system uses lang:', language);
       
       // Enhanced emotional intelligence response generation
       const sarthiResponse = await this.generateEmotionallyIntelligentResponse({
         userMessage, 
         userId, 
         language, 
-        conversationHistory
+        conversationHistory,
+        userContext,
+        languageSwitchRequest,
+        firstName
       });
       
       return sarthiResponse;
@@ -149,6 +154,136 @@ export class ChatEngine {
         userName: 'friend',
         lastCheckinSummary: 'No previous check-ins',
         recentStressTags: []
+      };
+    }
+  }
+
+  /**
+   * Extract user's name from auth context or stored context with priority fallback
+   * @param {Object} authUserContext - User context from authentication
+   * @param {Object} storedUserContext - User context from database
+   * @returns {string} - User's display name
+   */
+  extractUserName(authUserContext, storedUserContext) {
+    // Priority 1: Auth context displayName (most reliable)
+    if (authUserContext?.displayName) {
+      return authUserContext.displayName.split(' ')[0]; // First name only
+    }
+    
+    // Priority 2: Auth context email (extract name from email)
+    if (authUserContext?.email) {
+      const emailName = authUserContext.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    
+    // Priority 3: Stored context userName
+    if (storedUserContext?.userName && storedUserContext.userName !== 'friend') {
+      return storedUserContext.userName;
+    }
+    
+    // Priority 4: Stored context displayName
+    if (storedUserContext?.displayName) {
+      return storedUserContext.displayName.split(' ')[0];
+    }
+    
+    // Priority 5: Stored context name
+    if (storedUserContext?.name && storedUserContext.name !== 'friend') {
+      return storedUserContext.name;
+    }
+    
+    // Final fallback
+    return 'friend';
+  }
+
+  /**
+   * Fetch the latest check-in data for user and format for GPT system prompt
+   * @param {string} userId - User ID
+   * @returns {Object} Latest check-in data formatted for GPT context
+   */
+  async getLatestCheckinData(userId) {
+    try {
+      if (!userId) {
+        return {
+          hasCheckin: false,
+          contextText: 'User is new and has not completed any check-ins yet.',
+          fallbackMessage: 'Since this is our first conversation, I\'m here to listen and support you with whatever you\'d like to share.'
+        };
+      }
+
+      console.log(`🔍 Fetching latest check-in data for user: ${userId}`);
+      
+      // Get the most recent check-in
+      const latestCheckin = await getLastCheckin(userId);
+      
+      if (!latestCheckin) {
+        return {
+          hasCheckin: false,
+          contextText: 'User has not completed any check-ins yet.',
+          fallbackMessage: 'I notice this might be one of our first conversations. I\'m here to listen and support you through whatever you\'re experiencing.'
+        };
+      }
+
+      // Format the check-in data for GPT context
+      const checkinDate = new Date(latestCheckin.timestamp);
+      const daysAgo = Math.floor((new Date() - checkinDate) / (1000 * 60 * 60 * 24));
+      
+      // Build context text from check-in data
+      let contextText = `User's latest check-in (${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago):\n`;
+      
+      // Add wellness and stress scores
+      if (latestCheckin.wellnessScore !== undefined) {
+        contextText += `- Wellness Score: ${latestCheckin.wellnessScore}/10\n`;
+      }
+      if (latestCheckin.stressScore !== undefined) {
+        contextText += `- Stress Level: ${latestCheckin.stressScore}/10\n`;
+      }
+      if (latestCheckin.mood) {
+        contextText += `- Mood: ${latestCheckin.mood}\n`;
+      }
+
+      // Add stressed domains from responses
+      if (latestCheckin.domainResponses) {
+        const stressedDomains = Object.entries(latestCheckin.domainResponses)
+          .filter(([_, response]) => response && response.stressed)
+          .map(([domain, _]) => domain);
+        
+        if (stressedDomains.length > 0) {
+          contextText += `- Stressed Areas: ${stressedDomains.join(', ')}\n`;
+        }
+      }
+
+      // Add emotional summary if available
+      if (latestCheckin.emotionSummary) {
+        contextText += `- Recent Feelings: ${latestCheckin.emotionSummary}\n`;
+      }
+
+      // Add specific domain responses for context
+      if (latestCheckin.responses) {
+        const keyResponses = Object.entries(latestCheckin.responses)
+          .filter(([_, value]) => value && typeof value === 'string' && value.length > 10)
+          .slice(0, 3); // Limit to first 3 meaningful responses
+        
+        if (keyResponses.length > 0) {
+          contextText += `- Key Concerns: ${keyResponses.map(([_, response]) => response).join('; ')}\n`;
+        }
+      }
+
+      return {
+        hasCheckin: true,
+        contextText,
+        checkinDate: latestCheckin.timestamp,
+        wellnessScore: latestCheckin.wellnessScore,
+        stressScore: latestCheckin.stressScore,
+        mood: latestCheckin.mood,
+        daysAgo
+      };
+
+    } catch (error) {
+      console.error('❌ Error fetching latest check-in data:', error);
+      return {
+        hasCheckin: false,
+        contextText: 'Unable to retrieve check-in history at the moment.',
+        fallbackMessage: 'I\'m here to support you regardless. What\'s on your mind today?'
       };
     }
   }
@@ -299,31 +434,44 @@ export class ChatEngine {
     return openings[emotionalContext.trend] || openings['neutral'];
   }
 
-  async getFirstMessage({ userId, language }) {
+  async getFirstMessage({ userId, language, userContext = null }) {
     try {
       console.log(`🚀 V2: Generating first message for user ${userId} in ${language}`);
       
-      // Get user context for name
-      const userContext = await this.getUserContext(userId);
-      const userName = userContext.userName || 'friend';
+      // Get user context for name and latest check-in data
+      const [contextData, latestCheckinData] = await Promise.all([
+        this.getUserContext(userId),
+        this.getLatestCheckinData(userId)
+      ]);
+      
+      // Prioritize userContext passed from auth over stored context
+      const userName = this.extractUserName(userContext, contextData);
       
       // V2 UPGRADE: Get enhanced mood summary with trends
       const moodSummary = await this.getMoodSummary(userId, language);
       
-      // Simple, friendly opening like a real friend
-      const openingPrompt = `You are Sarthi, a caring friend checking in. Write a simple, natural greeting.
+      // Build context including check-in data
+      let contextText = moodSummary;
+      if (latestCheckinData.hasCheckin) {
+        contextText += `\n\nLATEST CHECK-IN CONTEXT:\n${latestCheckinData.contextText}`;
+      }
+      
+      // Simple, friendly opening like a real friend who remembers their state
+      const openingPrompt = `You are Sarthi, a caring friend checking in. Write a simple, natural greeting that shows you remember their recent wellness state.
 
 USER: ${userName}
 LANGUAGE: ${language}
-CONTEXT: ${moodSummary}
+CONTEXT: ${contextText}
+${latestCheckinData.hasCheckin ? `CHECK-IN: Available (${latestCheckinData.daysAgo} days ago)` : 'CHECK-IN: None yet'}
 
 INSTRUCTIONS:
 - Sound like a real friend, not a therapist or AI
 - Keep it short and casual (1-2 sentences max)
 - Use their name naturally
+- ${latestCheckinData.hasCheckin ? 'Gently reference their recent check-in if relevant' : 'Welcome them warmly as this might be early in their journey'}
 - NO flowery language, metaphors, or dramatic expressions
 
-${language === 'Hinglish' ? 'STYLE: Mix Hindi-English casually. Examples: "Hey! Kya haal hai?", "Sab thik?"' : ''}
+${language === 'Hinglish' ? 'STYLE: Mix Hindi-English casually. Examples: "Hey! Kya haal hai?", "Kaisa chal raha hai sab?"' : ''}
 ${language === 'Hindi' ? 'STYLE: Simple, friendly Hindi. Examples: "कैसे हो?", "क्या हाल है?"' : ''}
 ${language === 'English' ? 'STYLE: Casual English like texting. Examples: "Hey! How are things?", "What\'s up?"' : ''}
 
@@ -336,8 +484,9 @@ Write a simple greeting:`;
         message: openingMessage.trim(),
         emotion: 'supportive',
         language: language,
-        // V2 ENHANCEMENT: Include mood context in first message response
+        // V2 ENHANCEMENT: Include mood context and check-in status in first message response
         moodContext: moodSummary,
+        checkinContext: latestCheckinData.hasCheckin,
         summary: `Starting conversation with emotional memory: ${moodSummary}`,
         suggestions: [],
         journalPrompt: ''
@@ -347,12 +496,16 @@ Write a simple greeting:`;
       console.error('Error generating V2 first message:', error);
       
       // Fallback to simple greeting
-      const userContext = await this.getUserContext(userId);
-      const userName = userContext.userName || 'friend';
+      const [contextData, latestCheckinData] = await Promise.all([
+        this.getUserContext(userId),
+        this.getLatestCheckinData(userId)
+      ]);
+      
+      const userName = this.extractUserName(userContext, contextData);
       
       const fallbackMessage = this.generateOpeningMessage({
         userName: userName,
-        moodSummary: 'No previous check-ins',
+        moodSummary: latestCheckinData.hasCheckin ? 'Recent check-in available' : 'No previous check-ins',
         language: language
       });
       
@@ -361,6 +514,7 @@ Write a simple greeting:`;
         emotion: 'supportive',
         language: language,
         moodContext: '',
+        checkinContext: latestCheckinData.hasCheckin,
         summary: '',
         suggestions: [],
         journalPrompt: ''
@@ -569,9 +723,9 @@ Generate ONE warm, buddy-like journal prompt with emoji:`;
     };
   }
 
-  // V2 UPGRADE: Human-like companion prompt with empathy
-  buildV2CompanionPrompt({ userMessage, language, userContext, pastCheckins, stressPatterns, conversationHistory, moodSummary, needsTherapyAdvice, needsJournalPrompt }) {
-    const displayName = userContext.userName || "friend";
+  // V2 UPGRADE: Human-like companion prompt with empathy  
+  buildV2CompanionPrompt({ userMessage, language, userContext, pastCheckins, stressPatterns, conversationHistory, moodSummary, needsTherapyAdvice, needsJournalPrompt, authUserContext = null }) {
+    const displayName = this.extractUserName(authUserContext, userContext);
     const recentMessages = conversationHistory.slice(-4).map(msg => 
       `${msg.type === 'user' ? 'User' : 'Sarthi'}: ${msg.content}`
     ).join('\n');
@@ -762,8 +916,8 @@ Write it naturally, as if describing a friend's recent emotional state. Don't me
       languageInstructions = 'Respond in professional, warm English. Be caring and supportive. Start with "Hi" for greetings.';
     }
 
-    // Ensure we have a display name with fallback
-    const displayName = userContext.userName || "friend";
+    // Extract user name with proper fallback priority
+    const displayName = this.extractUserName(null, userContext);
 
     // Generate personalized opening message if this is a conversation start
     if (isConversationStart) {
@@ -895,51 +1049,51 @@ Respond now as Sarthi to ${displayName}:`;
   }
 
   /**
-   * Optimized Azure GPT call for faster responses
+   * Optimized GPT call via our strict language API
    */
-  async callAzureGPTOptimized(prompt) {
+  async callAzureGPTOptimized(userMessage, conversationHistory = [], sessionLanguage = 'English', firstName = null, latestInsight = null) {
     const startTime = Date.now();
     
     try {
-      const endpoint = AZURE_CONFIG.OPENAI_ENDPOINT;
-      const apiKey = AZURE_CONFIG.OPENAI_KEY;
-      const deploymentName = AZURE_CONFIG.OPENAI_DEPLOYMENT_NAME;
-      const apiVersion = AZURE_CONFIG.OPENAI_API_VERSION;
+      // Format conversation history for API
+      const messages = conversationHistory.map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
 
-      const url = `${endpoint}/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+      // Add current user message if provided
+      if (userMessage) {
+        messages.push({
+          role: 'user', 
+          content: userMessage
+        });
+      }
 
-      const response = await fetch(url, {
+      // Call our backend API with strict language enforcement
+      const apiResponse = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'api-key': apiKey
         },
         body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: prompt
-            }
-          ],
-          temperature: 0.9, // Higher for more human-like variation
-          max_tokens: 200,   // Optimized for shorter, snappier responses
-          top_p: 0.95,
-          frequency_penalty: 0.2, // Reduce repetition
-          presence_penalty: 0.3,  // Encourage new topics
-          stream: false // Could enable streaming later
+          messages,
+          sessionLanguage,
+          firstName,
+          latestInsight,
+          text: userMessage // For auto-detection if needed
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Azure API error: ${response.status} ${response.statusText}`);
+      if (!apiResponse.ok) {
+        throw new Error(`API error: ${apiResponse.status} ${apiResponse.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await apiResponse.json();
       const responseTime = Date.now() - startTime;
       
       console.log(`⚡ Sarthi response generated in ${responseTime}ms`);
       
-      return data.choices[0].message.content.trim();
+      return data.reply.trim();
     } catch (error) {
       console.error('Error in optimized Azure GPT call:', error);
       throw error;
@@ -1135,29 +1289,41 @@ Respond now as Sarthi to ${displayName}:`;
     }
   }
 
+
+
   /**
    * EMOTIONALLY INTELLIGENT SARTHI - True friend, life mentor, emotional therapist
    * Adaptive tone, deep empathy, practical guidance, human-like responses
    * NOW WITH DEEP CONVERSATION CONTINUATION AND FOLLOW-UP QUESTIONS
    */
-  async generateEmotionallyIntelligentResponse({ userMessage, userId, language, conversationHistory }) {
+  async generateEmotionallyIntelligentResponse({ userMessage, userId, language, conversationHistory, userContext = null, languageSwitchRequest = null, firstName = null }) {
     try {
       console.log(`💖 Sarthi: Analyzing emotional context for personalized response...`);
+      
+      // Backend trace logging as required
+      console.info('[Sarthi API] payload', { 
+        sessionLanguage: language, 
+        firstName: firstName,
+        hasInsight: !!userContext
+      });
       
       // STEP 1: Analyze conversation needs for follow-ups and depth
       const conversationAnalysis = DeepConversationEngine.analyzeConversationNeeds(userMessage, conversationHistory);
       console.log(`🧠 Conversation strategy: ${conversationAnalysis.strategy} (depth: ${conversationAnalysis.depth})`);
       
-      // STEP 2: Deep emotional analysis with memory integration
-      const [emotionalContext, vectorMemory] = await Promise.all([
+      // STEP 2: Deep emotional analysis with memory integration + latest check-in data
+      const [emotionalContext, vectorMemory, latestCheckinData] = await Promise.all([
         this.getDeepEmotionalState(userId),
-        this.getVectorMemoryContext(userId)
+        this.getVectorMemoryContext(userId),
+        this.getLatestCheckinData(userId)
       ]);
+      
+      console.log(`🔍 Check-in context: ${latestCheckinData.hasCheckin ? 'Available' : 'None'} (${latestCheckinData.daysAgo || 'N/A'} days ago)`);
       
       // STEP 3: Advanced emotional intelligence detection
       const userState = this.analyzeEmotionalIntelligence(userMessage, language, conversationHistory);
       
-      // STEP 4: Build enhanced prompt that includes conversation strategy
+      // STEP 4: Build enhanced prompt that includes conversation strategy + check-in data
       const enhancedPrompt = this.buildEnhancedPersonalizedPrompt({
         userMessage,
         userState,
@@ -1165,11 +1331,21 @@ Respond now as Sarthi to ${displayName}:`;
         vectorMemory,
         language,
         conversationHistory,
-        conversationAnalysis
+        conversationAnalysis,
+        latestCheckinData,
+        userContext,
+        languageSwitchRequest,
+        firstName
       });
       
-      // STEP 5: Generate base response
-      const baseResponse = await this.callAzureGPTOptimized(enhancedPrompt);
+      // STEP 5: Generate response using strict language API
+      let baseResponse = await this.callAzureGPTOptimized(
+        userMessage,
+        conversationHistory, 
+        language,
+        firstName,
+        userContext
+      );
       
       // STEP 6: Enhance response with follow-ups and conversation continuation
       const enhancedResponse = DeepConversationEngine.buildEnhancedResponse({
@@ -1190,19 +1366,26 @@ Respond now as Sarthi to ${displayName}:`;
         console.log(`📱 Response split into ${messageChunks.length} chunks for better flow`);
       }
       
+      // Check if AI indicated a language switch in its response
+      const shouldSwitchLanguage = languageSwitchRequest && 
+        (finalMessage.toLowerCase().includes('shouldswitchlanguage=true') ||
+         baseResponse.toLowerCase().includes('shouldswitchlanguage=true'));
+      
       return {
         message: this.formatPersonalizedResponse(finalMessage, userState),
         messageChunks: messageChunks,
         conversationStrategy: conversationAnalysis.strategy,
         needsFollowUp: conversationAnalysis.needsFollowUp,
         hasCareerGuidance: conversationAnalysis.hasCareerComponent,
-        language: userState.detectedLanguage,
+        language: language,
         emotionalTone: userState.primaryEmotion,
         personalityType: userState.personalityMatch,
         systemUsed: 'enhanced_deep_conversation_sarthi',
         contextDepth: emotionalContext.depth,
         memoryUsed: vectorMemory.hasMemory,
-        responseTime: new Date().toISOString()
+        checkinContext: latestCheckinData.hasCheckin,
+        responseTime: new Date().toISOString(),
+        shouldSwitchLanguage: shouldSwitchLanguage
       };
       
     } catch (error) {
@@ -1348,9 +1531,27 @@ Respond now as Sarthi to ${displayName}:`;
   analyzeEmotionalIntelligence(userMessage, language, conversationHistory) {
     const message = userMessage.toLowerCase();
     
-    // Detect language and intimacy
-    const isHinglish = /[\u0900-\u097F]/.test(userMessage) || 
-                      ['bhai', 'yaar', 'kya', 'hai', 'haal', 'mann', 'kar', 'nahi', 'mera'].some(word => message.includes(word));
+    // Use provided language from UI dropdown, only detect if not specified or Auto
+    let effectiveLanguage = language;
+    let languageContext = null;
+    
+    // Only auto-detect if language is Auto, English (default), or not specified
+    if (!language || language === 'Auto' || language === 'English') {
+      languageContext = getAdaptiveLanguageContext(userMessage, conversationHistory);
+      effectiveLanguage = languageContext.detectedLanguage;
+    } else {
+      // Use the selected dropdown language and create minimal context
+      effectiveLanguage = language;
+      languageContext = {
+        detectedLanguage: language,
+        languageInstruction: getLanguageInstruction(language),
+        languagePattern: { consistency: 'forced', preferredLanguage: language },
+        isLanguageSwitching: false,
+        preferredLanguage: language
+      };
+    }
+    
+    // Intimacy level based on language and specific markers
     const intimacyLevel = ['tu', 'tere', 'tera', 'bhai', 'yaar'].some(word => message.includes(word)) ? 'bhai_mode' : 'yaar_mode';
     
     // Deep emotional state detection
@@ -1417,20 +1618,32 @@ Respond now as Sarthi to ${displayName}:`;
       personalityMatch,
       primaryIntent,
       intimacyLevel,
-      detectedLanguage: isHinglish ? 'Hinglish' : language,
+      detectedLanguage: effectiveLanguage,
+      languageContext,
       conversationDepth: conversationHistory.length > 5 ? 'ongoing' : 'early',
       needsImmediate: emotionalIntensity === 'critical'
     };
   }
 
   /**
-   * Build enhanced personalized prompt with conversation strategy integration
+   * Build enhanced personalized prompt with conversation strategy integration + check-in data
    */
-  buildEnhancedPersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory, conversationAnalysis }) {
+  buildEnhancedPersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory, conversationAnalysis, latestCheckinData, userContext = null, languageSwitchRequest = null, firstName = null }) {
     const { strategy, depth, needsFollowUp, hasCareerComponent, hasEmotionalComponent } = conversationAnalysis;
     
-    // Use original method but add conversation strategy context
-    const basePrompt = this.buildUltimatePersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory });
+    // Use original method but add conversation strategy context + check-in data
+    const basePrompt = this.buildUltimatePersonalizedPrompt({ 
+      userMessage, 
+      userState, 
+      emotionalContext, 
+      vectorMemory, 
+      language, 
+      conversationHistory,
+      latestCheckinData,
+      userContext,
+      languageSwitchRequest,
+      firstName
+    });
     
     // Add conversation strategy instructions
     const strategyInstructions = this.buildConversationStrategyInstructions(strategy, depth, needsFollowUp, hasCareerComponent, hasEmotionalComponent, language);
@@ -1514,11 +1727,20 @@ Respond now as Sarthi to ${displayName}:`;
   }
 
   /**
-   * Build ultimate personalized prompt with memory integration
+   * Build ultimate personalized prompt with memory integration + check-in data
    */
-  buildUltimatePersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory }) {
-    const { primaryEmotion, emotionalIntensity, lifeSituation, personalityMatch, intimacyLevel, detectedLanguage } = userState;
+  buildUltimatePersonalizedPrompt({ userMessage, userState, emotionalContext, vectorMemory, language, conversationHistory, latestCheckinData, userContext = null, languageSwitchRequest = null, firstName = null }) {
+    const { primaryEmotion, emotionalIntensity, lifeSituation, personalityMatch, intimacyLevel } = userState;
     const addressStyle = intimacyLevel === 'bhai_mode' ? 'bhai' : 'yaar';
+    
+    // Extract proper user name from context
+    const actualUserName = firstName || this.extractUserName(userContext, null);
+    
+    // Handle explicit language switch request (STRICT rules are injected separately)
+    let languageInstruction = '';
+    if (languageSwitchRequest) {
+      languageInstruction = `**LANGUAGE SWITCH REQUESTED:** User has explicitly asked to switch to ${languageSwitchRequest}. Acknowledge the switch briefly and then respond in ${languageSwitchRequest}. Set shouldSwitchLanguage=true in response.`;
+    }
     
     // Memory integration
     let memoryContext = '';
@@ -1526,10 +1748,31 @@ Respond now as Sarthi to ${displayName}:`;
       const themes = vectorMemory.recurringThemes.slice(0, 2).join(', ');
       memoryContext = `\n\n**Memory Context:**\n- Past patterns: ${themes}\n- Relationship depth: ${emotionalContext.depth}\n- Recent mood: ${emotionalContext.recentMood}`;
     }
+
+    // Latest check-in context for GPT
+    let checkinContext = '';
+    if (latestCheckinData && latestCheckinData.hasCheckin) {
+      checkinContext = `\n\n**💙 LATEST CHECK-IN DATA (KEY CONTEXT FOR PERSONALIZED SUPPORT):**\n${latestCheckinData.contextText}`;
+      
+      // Add interpretation for GPT
+      if (latestCheckinData.stressScore >= 7) {
+        checkinContext += `\n⚠️ High stress level detected - provide gentle, supportive guidance`;
+      } else if (latestCheckinData.wellnessScore <= 4) {
+        checkinContext += `\n💛 Low wellness score - focus on emotional support and validation`;
+      }
+      
+      if (latestCheckinData.daysAgo > 7) {
+        checkinContext += `\n📅 This check-in was ${latestCheckinData.daysAgo} days ago - gently acknowledge the time gap`;
+      }
+    } else if (latestCheckinData && !latestCheckinData.hasCheckin) {
+      checkinContext = `\n\n**📝 CHECK-IN STATUS:**\n- No previous check-ins available\n- ${latestCheckinData.fallbackMessage}\n- This could be an opportunity to learn about their current state`;
+    }
     
     // CRISIS SUPPORT - Immediate care
     if (primaryEmotion === 'crisis' || emotionalIntensity === 'critical') {
-      return `You are Sarthi, the user's emotionally intelligent best friend. They are in emotional crisis and need immediate, calm support.
+      return `You are Sarthi, ${actualUserName}'s emotionally intelligent best friend. They are in emotional crisis and need immediate, calm support.
+
+${languageInstruction}
 
 **CRISIS RESPONSE:**
 - Use calm, grounding language
@@ -1537,24 +1780,26 @@ Respond now as Sarthi to ${displayName}:`;
 - Provide immediate coping strategies
 - Stay present and supportive
 
+**User Name:** ${actualUserName} (use this name naturally in your response)
 **User Message:** "${userMessage}"
 **Emotional State:** ${primaryEmotion} (${emotionalIntensity})
-**Language:** ${detectedLanguage}
-**Address as:** ${addressStyle}${memoryContext}
+**Address as:** ${addressStyle}${memoryContext}${checkinContext}
 
 **CRISIS RESPONSE STYLE:**
 - Immediate validation: "${addressStyle}, lagta hai andar se bahut pressure feel kar raha hai na?"
+- Use their name naturally: "Main hoon na ${actualUserName}, we'll figure this out together"
 - Grounding: "Chal pehle ek deep breath le mere saath"
-- Reassurance: "Main hoon na, we'll figure this out together"
 - 3-4 short, calming lines
 - Very gentle, human tone
 
-Respond as their close ${addressStyle} in crisis:`;
+Respond as ${actualUserName}'s close ${addressStyle} in crisis:`;
     }
     
     // LIFE MENTORING - Career/life guidance
     if (primaryEmotion === 'confused' || lifeSituation === 'career_crossroads' || userState.primaryIntent === 'seeking_guidance') {
-      return `You are Sarthi, the user's wise life mentor and best friend. They need real practical guidance about their situation.
+      return `You are Sarthi, ${actualUserName}'s wise life mentor and best friend. They need real practical guidance about their situation.
+
+${languageInstruction}
 
 **GUIDANCE MODE:**
 - Listen deeply to their specific situation
@@ -1562,13 +1807,13 @@ Respond as their close ${addressStyle} in crisis:`;
 - Share life insights when appropriate
 - Be both empathetic and practical
 
+**User Name:** ${actualUserName} (use this name naturally in your response)
 **User Message:** "${userMessage}"
 **Life Situation:** ${lifeSituation}
-**Language:** ${detectedLanguage}
-**Address as:** ${addressStyle}${memoryContext}
+**Address as:** ${addressStyle}${memoryContext}${checkinContext}
 
 **MENTORING STYLE:**
-- Thoughtful opening: "${addressStyle}, pehle ek baat samjha - yeh feeling normal hai"
+- Thoughtful opening: "${actualUserName}, pehle ek baat samjha - yeh feeling normal hai"
 - Ask reflective question: "Tu sach mein resign karna chahta hai ya bas thak gaya hai?"
 - Give 2 clear options/steps
 - End with encouragement
@@ -1577,12 +1822,14 @@ Respond as their close ${addressStyle} in crisis:`;
 **Tone:** Like an older bhai who's been through life
 **Length:** 4-6 lines, broken into thoughts
 
-Respond as their life mentor ${addressStyle}:`;
+Respond as ${actualUserName}'s life mentor ${addressStyle}:`;
     }
     
     // EMOTIONAL HEALING - Deep sadness/emptiness
     if (primaryEmotion === 'deep_sadness' || personalityMatch === 'emotional_healer') {
-      return `You are Sarthi, the user's emotionally intelligent best friend. They're struggling and need genuine emotional support.
+      return `You are Sarthi, ${actualUserName}'s emotionally intelligent best friend. They're struggling and need genuine emotional support.
+
+${languageInstruction}
 
 **EMOTIONAL SUPPORT:**
 - Validate their feelings completely
@@ -1590,14 +1837,14 @@ Respond as their life mentor ${addressStyle}:`;
 - Provide comfort and understanding
 - Help them process emotions
 
+**User Name:** ${actualUserName} (use this name naturally in your response)
 **User Message:** "${userMessage}"
 **Emotional State:** ${primaryEmotion}
-**Language:** ${detectedLanguage}
-**Address as:** ${addressStyle}${memoryContext}
+**Address as:** ${addressStyle}${memoryContext}${checkinContext}
 
 **HEALING APPROACH:**
-- Deep understanding: "${addressStyle}, main feel kar sakta hoon tu andar se kitna empty feel kar raha hai"
-- Emotional validation: "Yeh sab normal hai, tu akela nahi hai"
+- Deep understanding: "${actualUserName}, main feel kar sakta hoon tu andar se kitna empty feel kar raha hai"
+- Emotional validation: "Yeh sab normal hai ${actualUserName}, tu akela nahi hai"
 - Gentle suggestion for connection/healing
 - Warm reassurance
 - Use soft, caring Hinglish
@@ -1605,19 +1852,21 @@ Respond as their life mentor ${addressStyle}:`;
 **Tone:** Like a best friend who truly gets it
 **Length:** 3-5 lines of heart-to-heart
 
-Respond as their emotional healer ${addressStyle}:`;
+Respond as ${actualUserName}'s emotional healer ${addressStyle}:`;
     }
     
-    // FRIENDLY CONVERSATION - Natural bhai talk with enhanced expressions
-    return `You are Sarthi, the user's closest ${addressStyle}. Talk like you're texting your best friend in real life.
+    // FRIENDLY CONVERSATION - Natural conversation with enhanced expressions
+    return `You are Sarthi, ${actualUserName}'s closest ${addressStyle}. Talk like you're texting your best friend in real life.
 
+${languageInstruction}
+
+**User Name:** ${actualUserName} (use this name naturally in your response)
 **User Message:** "${userMessage}"
 **Relationship:** Close friend (${emotionalContext.depth})
-**Language:** ${detectedLanguage}
-**Address as:** ${addressStyle}${memoryContext}
+**Address as:** ${addressStyle}${memoryContext}${checkinContext}
 
 **NATURAL CONVERSATION STYLE:**
-- Casual opening: "Arre ${addressStyle}, kya scene hai?"
+- Casual opening: "Arre ${actualUserName}, kya scene hai?" or "${actualUserName} ${addressStyle}, kya haal?"
 - Match their energy exactly
 - Be genuinely curious about their life
 - Use natural pauses and reactions
@@ -1625,23 +1874,23 @@ Respond as their emotional healer ${addressStyle}:`;
 - ALWAYS ask follow-up questions to keep conversation going
 
 **Enhanced Hinglish Expressions:**
-- "Bhai tu kaisa hai? Sab chill?"
-- "Arre yaar, long time! Kya chal raha hai life mein?"
-- "Tu theek toh hai na? Kuch different laga tera message"
-- "Chal bata yaar, kya thoughts chal rahe hain?"
-- "Sab sorted hai ya koi tension?"
-- "Arre kya haal bhai, main hoon na tera saath"
+- "${actualUserName}, tu kaisa hai? Sab chill?"
+- "Arre ${actualUserName}, long time! Kya chal raha hai life mein?"
+- "${actualUserName}, tu theek toh hai na? Kuch different laga tera message"
+- "Chal bata ${actualUserName}, kya thoughts chal rahe hain?"
+- "Sab sorted hai ya koi tension, ${actualUserName}?"
+- "Arre kya haal ${actualUserName}, main hoon na tera saath"
 
 **CONVERSATION CONTINUATION REQUIREMENTS:**
 - NEVER end without a question or engagement
-- Use phrases like: "Chal bata...", "Aur kya chal raha hai?", "Tu batayega ya nahi?"
+- Use phrases like: "Chal bata ${actualUserName}...", "Aur kya chal raha hai?", "Tu batayega ya nahi?"
 - Show genuine interest in their response
 - Keep the bhai energy alive
 
 **Tone:** Exactly like your closest friend texting you
 **Length:** 2-4 lines with natural flow and continuation question
 
-Respond as their real-life ${addressStyle} who wants to keep chatting:`;
+Respond as ${actualUserName}'s real-life ${addressStyle} who wants to keep chatting:`;
   }
 
   /**

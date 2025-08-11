@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { buttonStyles, cardStyles, chipStyles, typography } from '../utils/designSystem';
 import { 
   Sparkles, Brain, Heart, Calendar, Activity, Target, Award,
   MessageCircle, Phone, TrendingUp, TrendingDown, AlertTriangle,
@@ -44,6 +45,8 @@ const DashboardPage = () => {
   const [showPastAssessments, setShowPastAssessments] = useState(false);
   const [assessmentData, setAssessmentData] = useState(null);
   const [loadingAssessment, setLoadingAssessment] = useState(false);
+  const [surveyInsights, setSurveyInsights] = useState([]);
+  const [realTimeInsights, setRealTimeInsights] = useState(null);
   
   // Derived state for current wellness status
   const [currentWellness, setCurrentWellness] = useState({
@@ -365,7 +368,7 @@ const DashboardPage = () => {
       return { daysUntil: 0, message: 'Due today' };
     } else if (daysUntil === 1) {
       return { daysUntil: 1, message: 'Due tomorrow' };
-          } else {
+    } else {
       return { daysUntil, message: `${daysUntil} days away` };
     }
   };
@@ -587,7 +590,7 @@ const DashboardPage = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <motion.div 
           className="text-center"
           initial={{ opacity: 0 }}
@@ -601,8 +604,8 @@ const DashboardPage = () => {
             <div className="absolute inset-0 rounded-full border-4 border-[#D8D8D8]"></div>
             <div className="absolute inset-0 rounded-full border-4 border-[#007CFF] border-t-transparent"></div>
           </motion.div>
-          <h2 className="text-2xl font-bold text-black mb-4">Loading your wellness dashboard...</h2>
-          <p className="text-[#777] font-medium">Analyzing your complete check-in history</p>
+          <h2 className={`${typography.h3} mb-4`}>Loading your wellness dashboard...</h2>
+          <p className={`${typography.body} font-medium`}>Analyzing your complete check-in history</p>
         </motion.div>
       </div>
     );
@@ -611,7 +614,7 @@ const DashboardPage = () => {
   // Error state
   if (error) {
   return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center px-4">
         <motion.div 
           className="bg-white rounded-3xl p-12 shadow-lg border border-[#D8D8D8] text-center max-w-md mx-auto"
           initial={{ opacity: 0, y: 20 }}
@@ -620,11 +623,11 @@ const DashboardPage = () => {
           <div className="w-20 h-20 bg-red-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <AlertTriangle className="h-10 w-10 text-red-600" />
           </div>
-          <h2 className="text-2xl font-bold text-black mb-4">Unable to load dashboard</h2>
-          <p className="text-[#777] mb-6 font-medium">{error}</p>
+          <h2 className={`${typography.h3} mb-4`}>Unable to load dashboard</h2>
+          <p className={`${typography.body} mb-6 font-medium`}>{error}</p>
           <motion.button 
             onClick={() => loadAllCheckins(true)}
-            className="bg-[#007CFF] hover:bg-[#0066CC] text-white px-6 py-3 rounded-2xl transition-all duration-300 flex items-center space-x-3 mx-auto font-bold shadow-lg hover:shadow-xl"
+            className={`${buttonStyles.primary} flex items-center space-x-3 mx-auto`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -636,20 +639,22 @@ const DashboardPage = () => {
     );
   }
 
+  // Debug logging removed - dashboard ready for production
+
   // Empty state - no check-ins
   if (!historicalMetrics.hasData) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-8">
+      <div className="min-h-screen bg-neutral-50">
+        <div className="w-full max-w-[1440px] mx-auto px-4 py-8">
           <motion.div 
             className="flex justify-between items-start mb-12"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="bg-white rounded-3xl p-6 shadow-lg border border-[#D8D8D8]">
-              <h1 className="text-4xl font-bold text-black mb-3">{getGreeting()}</h1>
-              <p className="text-[#777] font-medium">{new Date().toLocaleDateString('en-US', { 
+            <div className={`${cardStyles.base} rounded-2xl`}>
+              <h1 className={`${typography.h1} mb-3`}>{getGreeting()}</h1>
+              <p className={`${typography.body} font-medium`}>{new Date().toLocaleDateString('en-US', { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
@@ -658,7 +663,7 @@ const DashboardPage = () => {
             </div>
           <motion.button
               onClick={() => loadAllCheckins(true)}
-              className="bg-white text-[#777] px-6 py-3 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-all duration-300 flex items-center space-x-3 shadow-lg hover:shadow-xl"
+              className={`${buttonStyles.outline} flex items-center space-x-3`}
               disabled={loading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -675,23 +680,31 @@ const DashboardPage = () => {
             transition={{ duration: 0.5 }}
           >
             <motion.div 
-              className="bg-white rounded-3xl p-12 shadow-lg border border-[#D8D8D8] relative overflow-hidden group"
+              className={`${cardStyles.base} ${cardStyles.hover} relative overflow-hidden group rounded-2xl`}
               whileHover={{ y: -4, scale: 1.01 }}
             >
-              <div className="w-20 h-20 bg-[#007CFF] rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+              <div className="w-20 h-20 on-brand bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
                 <Brain className="h-10 w-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-black mb-6">Start your wellness journey</h2>
-              <p className="text-[#777] mb-8 text-lg leading-relaxed">
+              <h2 className={`${typography.h2} mb-6`}>Start your wellness journey</h2>
+              <p className={`${typography.bodyLarge} mb-8`}>
                 Complete your first check-in to track your wellness progress and get personalized insights.
               </p>
           <motion.button
                 onClick={() => navigate('/survey')}
-                className="bg-[#007CFF] hover:bg-[#0066CC] text-white px-8 py-4 rounded-2xl transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+                className={`${buttonStyles.primary} text-lg`}
+                style={{ 
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  fontWeight: '600'
+                }}
+                whileHover={{ 
+                  scale: 1.05,
+                  backgroundColor: '#1d4ed8'
+                }}
+                whileTap={{ scale: 0.95 }}
           >
-                Take Your First Check-in
+                <span style={{ color: '#ffffff' }}>Take Your First Check-in</span>
           </motion.button>
             </motion.div>
           </motion.div>
@@ -702,10 +715,11 @@ const DashboardPage = () => {
 
   // Main dashboard with data - Clean Professional Design
   return (
-    <div className="min-h-screen bg-white">
+    <>
+      <div className="min-h-screen bg-neutral-50">
         {/* Header */}
-      <div className="bg-white border-b border-[#D8D8D8] sticky top-0 z-10">
-        <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="w-full max-w-[1440px] mx-auto px-4 py-4">
         <motion.div 
             className="flex justify-between items-center"
             initial={{ opacity: 0, y: -10 }}
@@ -737,13 +751,17 @@ const DashboardPage = () => {
               
               <motion.button
                 onClick={() => loadAllCheckins(true)}
-                className="bg-white text-[#777] px-4 py-2 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md"
+                className="px-4 py-2 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md"
+                style={{ 
+                  backgroundColor: '#ffffff',
+                  color: '#374151'
+                }}
                 disabled={loading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="text-sm font-medium">Refresh</span>
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} style={{ color: '#374151' }} />
+                <span className="text-sm font-medium" style={{ color: '#374151' }}>Refresh</span>
               </motion.button>
           </div>
         </motion.div>
@@ -763,36 +781,18 @@ const DashboardPage = () => {
         </motion.div>
       )}
 
-      {/* Main Content */}
-      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-10">
+      {/* Main Content - Professional Dashboard Layout */}
+      <div className="max-w-[1440px] mx-auto px-4 py-10 grid grid-cols-12 gap-6 relative overflow-hidden">
         
-        {/* Top Row - 4 Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-8 mb-10">
-          {/* Current Wellness Score */}
-          <motion.div
-            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
-            whileHover={{ y: -3 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-              >
-                <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 bg-[#007CFF] rounded-2xl flex items-center justify-center shadow-sm`}>
-                    <Sparkles className="w-6 h-6 text-white" />
-                  </div>
-              <span className="text-3xl font-bold text-black">{currentWellness.score}/10</span>
-                </div>
-            <h3 className="font-semibold text-black mb-2">Wellness Score</h3>
-            <p className="text-sm text-[#777]">
-              {currentWellness.score >= 8 ? 'Excellent state' : 
-               currentWellness.score >= 6 ? 'Good wellness' : 
-               currentWellness.score >= 4 ? 'Needs attention' : 'Seek support'}
-                </p>
-              </motion.div>
+        {/* Left Section - Main Dashboard Content (9 columns) */}
+        <div className="col-span-12 lg:col-span-9 space-y-6">
+          
+          {/* Top Stats Cards Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
               {/* Current Mood */}
               <motion.div 
-            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 transition-all hover:shadow-md hover:-translate-y-1"
             whileHover={{ y: -3 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -812,7 +812,7 @@ const DashboardPage = () => {
 
           {/* Check-in Rate */}
               <motion.div 
-            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 transition-all hover:shadow-md hover:-translate-y-1"
             whileHover={{ y: -3 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -830,7 +830,7 @@ const DashboardPage = () => {
 
               {/* Next Check-in */}
               <motion.div 
-            className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6 transition-all hover:shadow-xl hover:scale-105"
+            className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 transition-all hover:shadow-md hover:-translate-y-1"
             whileHover={{ y: -3 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -847,16 +847,13 @@ const DashboardPage = () => {
             <h3 className="font-semibold text-black mb-2">Next Check-in</h3>
             <p className="text-sm text-[#777]">{nextCheckinInfo.message}</p>
               </motion.div>
-            </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-10">
-          {/* Left Column - Main Content */}
-          <div className="xl:col-span-3 space-y-8">
+          </div>
+          
+          {/* Analytics Dashboard Section */}
             
             {/* Analytics Header */}
             <motion.div 
-              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
@@ -870,19 +867,24 @@ const DashboardPage = () => {
                         <motion.button
                           onClick={handleViewPastAssessments}
                           disabled={loadingAssessment}
-                          className="flex items-center space-x-2 px-4 py-2 bg-white text-[#007CFF] rounded-2xl border border-[#007CFF] hover:bg-blue-50 transition-all duration-300 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50"
+                          className="flex items-center space-x-2 px-4 py-2 rounded-2xl border transition-all duration-300 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50"
+                          style={{ 
+                            backgroundColor: '#ffffff',
+                            color: '#007CFF',
+                            borderColor: '#007CFF'
+                          }}
                           whileHover={{ scale: loadingAssessment ? 1 : 1.02 }}
                           whileTap={{ scale: loadingAssessment ? 1 : 0.98 }}
                         >
                           {loadingAssessment ? (
                             <>
                               <div className="w-4 h-4 border-2 border-[#007CFF] border-t-transparent rounded-full animate-spin" />
-                              <span>Loading Assessment...</span>
+                              <span style={{ color: '#007CFF' }}>Loading Assessment...</span>
                             </>
                           ) : (
                             <>
-                              <Calendar className="w-4 h-4" />
-                              <span>📅 View Past Assessments</span>
+                              <Calendar className="w-4 h-4" style={{ color: '#007CFF' }} />
+                              <span style={{ color: '#007CFF' }}>📅 View Past Assessments</span>
                             </>
                           )}
                         </motion.button>
@@ -892,15 +894,19 @@ const DashboardPage = () => {
                     <motion.button
                             key={period}
                       onClick={() => setViewPeriod(period)}
-                      className={`px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200 ${
-                        viewPeriod === period
-                          ? 'bg-[#007CFF] text-white shadow-md'
-                          : 'bg-white text-[#777] hover:bg-gray-50 border border-[#C5C5C5]'
-                      }`}
+                      className={`px-4 py-2 rounded-2xl text-sm font-medium transition-all duration-200`}
+                      style={viewPeriod === period ? {
+                        backgroundColor: '#007CFF',
+                        color: '#ffffff'
+                      } : {
+                        backgroundColor: '#ffffff',
+                        color: '#374151',
+                        border: '1px solid #C5C5C5'
+                      }}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      {period}d
+                      <span style={{ color: viewPeriod === period ? '#ffffff' : '#374151' }}>{period}d</span>
                     </motion.button>
                         ))}
                         </div>
@@ -992,7 +998,7 @@ const DashboardPage = () => {
                 {/* AI Insights */}
             {aiInsights && (
                 <motion.div 
-                className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 }}
@@ -1073,7 +1079,7 @@ const DashboardPage = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <X className="w-6 h-6 text-gray-600" />
+                        <X className="w-6 h-6 text-gray-700" />
                       </motion.button>
                     </div>
                   </div>
@@ -1137,16 +1143,13 @@ const DashboardPage = () => {
                 </motion.div>
               </motion.div>
             )}
-              </div>
-
-          {/* Right Column - Sidebar */}
-          <div className="xl:col-span-2 space-y-6">
-            
-            {/* Top Row - Daily Goals and Crisis Support */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        </div>
+        
+        {/* Right Section - Support Tools (3 columns) */}
+        <div className="col-span-12 lg:col-span-3 space-y-6">
               {/* Daily Goals */}
                 <motion.div 
-                className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+                className="w-full bg-white rounded-xl shadow-md border border-gray-200 p-6"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
@@ -1184,7 +1187,7 @@ const DashboardPage = () => {
 
             {/* Crisis Support */}
                 <motion.div 
-              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+              className="w-full bg-white rounded-xl shadow-md border border-gray-200 p-6"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.2 }}
@@ -1204,11 +1207,10 @@ const DashboardPage = () => {
                 Free, confidential support
               </p>
                 </motion.div>
-            </div>
 
             {/* Quick Actions */}
                 <motion.div 
-              className="bg-white rounded-3xl shadow-lg border border-[#D8D8D8] p-6"
+              className="w-full bg-white rounded-xl shadow-md border border-gray-200 p-6"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.3 }}
@@ -1232,124 +1234,107 @@ const DashboardPage = () => {
                 )}
                 <motion.button
                   onClick={() => navigate('/survey')}
-                  className="w-full bg-[#007CFF] hover:bg-[#0066CC] text-white py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
-                  whileHover={{ scale: 1.05 }}
+                  className="w-full py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
+                  style={{ 
+                    backgroundColor: '#007CFF',
+                    color: '#ffffff'
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    backgroundColor: '#0066CC'
+                  }}
                   whileTap={{ scale: 0.99 }}
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Take Survey</span>
+                  <Sparkles className="w-4 h-4" style={{ color: '#ffffff' }} />
+                  <span style={{ color: '#ffffff' }}>Take Survey</span>
                 </motion.button>
                 <motion.button
                   onClick={() => setShowChatbot(true)}
-                  className="w-full bg-[#007CFF] hover:bg-[#0066CC] text-white py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
-                  whileHover={{ scale: 1.05 }}
+                  className="w-full py-3 px-4 rounded-2xl transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 hover:scale-105"
+                  style={{ 
+                    backgroundColor: '#007CFF',
+                    color: '#ffffff'
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    backgroundColor: '#0066CC'
+                  }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Heart className="w-4 h-4" />
-                  <span>Chat with Sarthi</span>
+                  <Heart className="w-4 h-4" style={{ color: '#ffffff' }} />
+                  <span style={{ color: '#ffffff' }}>Chat with Sarthi</span>
                 </motion.button>
                 <motion.button
                   onClick={() => loadAllCheckins(true)}
-                  className="w-full bg-white text-[#777] py-3 px-4 rounded-2xl border border-[#C5C5C5] hover:bg-gray-50 transition-colors text-sm font-semibold flex items-center justify-center space-x-2 hover:scale-105"
+                  className="w-full py-3 px-4 rounded-2xl border transition-colors text-sm font-semibold flex items-center justify-center space-x-2 hover:scale-105"
+                  style={{ 
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    border: '1px solid #C5C5C5'
+                  }}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Refresh</span>
+                  <RefreshCw className="w-4 h-4" style={{ color: '#374151' }} />
+                  <span style={{ color: '#374151' }}>Refresh</span>
                 </motion.button>
             </div>
           </motion.div>
 
-            {/* Therapist Landing Section */}
+          {/* Professional Therapy Card */}
           <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.4 }}
+              className="w-full"
             >
-              <TherapistLandingSection />
+              <TherapistLandingSection className="w-full" />
           </motion.div>
+        </div>
+      </div>
 
-            {/* Chat History Widget */}
-          <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-            >
-              <ChatHistoryWidget 
-                userId={currentUser?.uid} 
-                onResumeChat={handleResumeChat}
-              />
-            </motion.div>
-                          </div>
-                </div>
-              </div>
+      {/* Update Notification */}
+      {showUpdateNotification && (
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className="fixed top-24 right-6 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg z-50 flex items-center space-x-3"
+        >
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span className="font-medium">✨ Dashboard updated with your latest check-in!</span>
+        </motion.div>
+      )}
 
-      {/* Manova Chatbot Modal */}
+
+        {/* Manova Chatbot Modal */}
       {showChatbot && (
           <motion.div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 md:p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           onClick={() => setShowChatbot(false)}
           >
             <motion.div
-            className="bg-white rounded-3xl shadow-xl w-full max-w-4xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col mx-4 md:mx-0"
+            className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full max-w-[980px] md:max-w-[1040px] h-[92vh] md:h-[82vh] overflow-hidden flex flex-col"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D8D8D8] bg-white shadow-sm rounded-t-3xl z-10">
-              <div className="flex items-center space-x-3 min-w-0">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden bg-[#007CFF]">
-                  <img 
-                    src="/images/mascot.svg" 
-                    alt="Sarthi Avatar"
-                    className="w-10 h-10 object-cover"
-                  />
-                  </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-lg md:text-xl font-semibold text-black truncate">
-                    Sarthi – Your Emotional Wellness Companion
-                  </h2>
-                  <p className="text-sm text-[#777] mt-1">
-                    Here to listen, understand, and support.
-                      </p>
-                    </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                <motion.button
-                  onClick={() => {
-                    if (newChatFunctionRef.current) {
-                      newChatFunctionRef.current();
-                    } else {
-                      console.log('New chat function not available yet');
-                    }
-                  }}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-2xl text-sm font-medium bg-blue-50 text-[#007CFF] hover:bg-blue-100 transition-all shadow-sm border border-blue-100"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New Chat</span>
-                </motion.button>
-                
-                <button
-                  onClick={() => setShowChatbot(false)}
-                  className="text-[#777] hover:text-black transition-colors p-2 rounded-2xl hover:bg-gray-50"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
             <div className="flex-1 overflow-hidden">
-              <ChatSessionProvider userId={currentUser?.uid}>
+              <ChatSessionProvider 
+                userId={currentUser?.uid}
+                userContext={{
+                  displayName: currentUser?.displayName,
+                  email: currentUser?.email,
+                  uid: currentUser?.uid
+                }}
+              >
                 <SarthiChatbox 
                   userId={currentUser?.uid}
+                  onClose={() => setShowChatbot(false)}
                   onNewChat={(startNewChatFn) => {
                     // Store the function reference to use in the header
                     newChatFunctionRef.current = startNewChatFn;
@@ -1361,6 +1346,7 @@ const DashboardPage = () => {
           </motion.div>
         )}
       </div>
+    </>
   );
 };
 

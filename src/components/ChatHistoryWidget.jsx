@@ -3,7 +3,7 @@
  * Shows recent chat sessions with quick resume functionality
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, 
@@ -28,7 +28,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
     }
   }, [userId]);
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -48,19 +48,25 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  const handleRefresh = async () => {
+  useEffect(() => {
+    if (userId) {
+      loadChatHistory();
+    }
+  }, [loadChatHistory]);
+
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadChatHistory();
     setRefreshing(false);
-  };
+  }, [loadChatHistory]);
 
-  const handleResumeChat = (sessionId) => {
+  const handleResumeChat = useCallback((sessionId) => {
     if (onResumeChat) {
       onResumeChat(sessionId);
     }
-  };
+  }, [onResumeChat]);
 
   const formatDate = (date) => {
     if (!date) return 'Unknown date';
@@ -92,7 +98,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
     switch (language) {
       case 'Hindi': return '🇮🇳';
       case 'Hinglish': return '🔄';
-      case 'English': return '🇺🇸';
+      case 'English': return '💬';
       default: return '💬';
     }
   };
@@ -179,7 +185,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
           <p className="text-[#777] text-xs mt-1">Start a conversation with Sarthi!</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[420px] overflow-y-auto px-2 rounded-xl shadow-sm border border-gray-200 bg-white p-2">
           <AnimatePresence>
             {chatHistory.map((session, index) => (
               <motion.div
@@ -188,43 +194,53 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ delay: index * 0.1 }}
-                className="group border border-[#D8D8D8] rounded-2xl p-4 hover:border-[#007CFF] hover:shadow-sm transition-all duration-200 cursor-pointer"
+                className="group border border-[#D8D8D8] rounded-2xl p-4 hover:border-[#007CFF] hover:shadow-sm transition-all duration-200 cursor-pointer overflow-hidden"
                 onClick={() => handleResumeChat(session.sessionId)}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1">
+                <div className="flex items-start justify-between min-w-0">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0">
                     {/* Session Icon */}
-                    <div className="p-2 bg-blue-50 rounded-2xl group-hover:bg-blue-100 transition-colors">
+                    <div className="p-2 bg-blue-50 rounded-2xl group-hover:bg-blue-100 transition-colors flex-shrink-0">
                       <MessageCircle className="h-4 w-4 text-[#007CFF]" />
                     </div>
                     
                     {/* Session Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-sm font-medium text-black truncate">
+                        <span className="text-sm font-medium text-black truncate overflow-hidden" style={{ 
+                          maxWidth: 'calc(100% - 2rem)',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word'
+                        }}>
                           {session.summary || 'Chat Session'}
                         </span>
-                        <span className="text-xs">
+                        <span className="text-xs flex-shrink-0">
                           {getLanguageEmoji(session.languagePref)}
                         </span>
                       </div>
                       
                       {session.preview && (
-                        <p className="text-xs text-[#777] line-clamp-2 mb-2">
+                        <p className="text-xs text-[#777] line-clamp-2 mb-2 break-words overflow-hidden" style={{ 
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word'
+                        }}>
                           {session.preview}
                         </p>
                       )}
                       
-                      <div className="flex items-center space-x-3 text-xs text-[#777]">
-                        <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-3 text-xs text-[#777] flex-wrap">
+                        <div className="flex items-center space-x-1 flex-shrink-0">
                           <Calendar className="h-3 w-3" />
                           <span>{formatDate(session.lastUpdated)}</span>
                         </div>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1 flex-shrink-0">
                           <Clock className="h-3 w-3" />
                           <span>{formatTime(session.lastUpdated)}</span>
                         </div>
-                        <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">
+                        <span className="px-2 py-1 bg-gray-100 rounded-full text-xs flex-shrink-0">
                           {session.messageCount || 0} messages
                         </span>
                       </div>
@@ -233,7 +249,7 @@ const ChatHistoryWidget = ({ userId, onResumeChat }) => {
                   
                   {/* Resume Button */}
                   <motion.div
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >

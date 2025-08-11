@@ -8,12 +8,16 @@ export const useWellnessChat = (userId) => {
     isLoading,
     isTyping,
     language,
+    uiLanguageChoice,
+    sessionLanguage,
     error,
     sendMessage,
     createNewSession,
     loadSession,
     changeLanguage,
-    clearSession
+    setUiLanguageChoice,
+    clearSession,
+    dispatch
   } = useChatSession();
 
   const [inputValue, setInputValue] = useState('');
@@ -25,6 +29,7 @@ export const useWellnessChat = (userId) => {
   const messagesEndRef = useRef(null);
   const lastMessageCountRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
+  const acknowledgedLangRef = useRef(new Set());
 
   // Deduplicate messages for stable rendering
   const uniqueMessages = messages.filter((message, index, arr) => 
@@ -105,6 +110,38 @@ export const useWellnessChat = (userId) => {
     setInputValue(''); // Clear immediately for better UX
     
     try {
+      // LANGUAGE LOCK: determine session language (first message) or override on demand
+      const hin = /[\u0900-\u097F]/; // Devanagari
+      const eng = /[A-Za-z]/;
+      const detectLanguage = (text) => {
+        if (hin.test(text) && eng.test(text)) return 'Hinglish';
+        if (hin.test(text)) return 'Hindi';
+        return 'English';
+      };
+
+      // Respect explicit user requests like "reply in English/Hindi/Hinglish"
+      const lower = messageToSend.toLowerCase();
+      let explicitLang = null;
+      if (lower.includes('reply in english') || lower.includes('english please') || lower.includes('in english')) explicitLang = 'English';
+      else if (lower.includes('reply in hindi') || lower.includes('hindi please') || lower.includes('in hindi')) explicitLang = 'Hindi';
+      else if (lower.includes('reply in hinglish') || lower.includes('hinglish please') || lower.includes('in hinglish')) explicitLang = 'Hinglish';
+
+      // Lock language on first message or override explicitly
+      const isFirstUserMessage = messages.filter(m => m.type === 'user').length === 0;
+      const inferred = explicitLang || (isFirstUserMessage ? detectLanguage(messageToSend) : null);
+      if (inferred && inferred !== language) {
+        try { await changeLanguage(inferred); } catch { /* ignore */ }
+        if (!acknowledgedLangRef.current.has(inferred)) {
+          acknowledgedLangRef.current.add(inferred);
+          const ackText = inferred === 'Hindi'
+            ? 'ठीक है — अब मैं हिंदी में जवाब दूंगा।'
+            : inferred === 'Hinglish'
+            ? 'Theek hai — ab se main Hinglish mein reply karunga.'
+            : "Okay — I'll reply in English from now on.";
+          dispatch({ type: 'ADD_MESSAGE', payload: { type: 'system', content: ackText, timestamp: new Date() } });
+        }
+      }
+
       await sendMessage(messageToSend);
       
       // Scroll to bottom after sending message
@@ -126,11 +163,11 @@ export const useWellnessChat = (userId) => {
       setInputValue(messageToSend); // Restore on error
       console.error('Error sending message:', error);
     }
-  }, [inputValue, isLoading, isTyping, sendMessage]);
+  }, [inputValue, isLoading, isTyping, sendMessage, changeLanguage, dispatch, language, messages]);
 
   // Handle key press with modern event handling
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -159,6 +196,8 @@ export const useWellnessChat = (userId) => {
     isLoading,
     isTyping: isTyping && showTypingDelay,
     language,
+    uiLanguageChoice,
+    sessionLanguage,
     error,
     
     // Refs
@@ -172,6 +211,7 @@ export const useWellnessChat = (userId) => {
     startNewChat,
     initializeChat,
     changeLanguage,
+    setUiLanguageChoice,
     
     // Computed
     canSend: inputValue.trim() && !isLoading && !isTyping && currentSessionId,

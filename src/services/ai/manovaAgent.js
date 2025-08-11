@@ -627,7 +627,7 @@ export const generateSarthiResponse = async (userId, userMessage, languagePrefer
     const ultimateSarthiPrompt = createUltimatePersonalizedSarthiPrompt(userMessage, context);
     
     // Call Azure GPT-4o with ultimate personalized Sarthi prompt
-    const response = await fetch('/api/openai-chat', {
+    const response = await fetch('http://localhost:8001/api/openai-chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1091,7 +1091,7 @@ Analyze both content and tone of the answer. Focus on emotional signals, intensi
   try {
     // Call Azure GPT-4o for enhanced psychological analysis
     console.log('📡 Calling Azure GPT-4o for stress analysis...');
-    const response = await fetch('/api/openai-chat', {
+    const response = await fetch('http://localhost:8001/api/openai-chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1119,7 +1119,8 @@ Analyze both content and tone of the answer. Focus on emotional signals, intensi
       enhancedEmotion: parsed.enhancedEmotion || 'Stressed',
       enhancedIntensity: parsed.enhancedIntensity || 'Moderate',
       reason: parsed.reason || 'Psychological analysis completed based on response patterns.',
-      causeTag: parsed.causeTag || domain || 'General'
+      causeTag: parsed.causeTag || domain || 'General',
+      shouldTrigger: false // Will be set based on score and intensity below
     };
     
     // Ensure intensity is valid (updated to match new 3-level system)
@@ -1146,6 +1147,9 @@ Analyze both content and tone of the answer. Focus on emotional signals, intensi
         validatedResult.causeTag = 'General';
       }
     }
+    
+    // Set shouldTrigger based on score and intensity
+    validatedResult.shouldTrigger = validatedResult.enhancedScore >= 7 || validatedResult.enhancedIntensity === 'High';
     
     console.log('✅ Final validated analysis:', validatedResult);
     return validatedResult;
@@ -1206,7 +1210,8 @@ Analyze both content and tone of the answer. Focus on emotional signals, intensi
       enhancedEmotion,
       enhancedIntensity,
       reason,
-      causeTag: causeTag
+      causeTag: causeTag,
+      shouldTrigger: finalScore >= 7 || enhancedIntensity === 'High'
     };
     
     console.log('🔄 Fallback analysis result:', fallbackResult);
@@ -1236,7 +1241,7 @@ Output format:
 
   try {
     // Use the server API for therapeutic insights
-    const response = await fetch('/api/openai-chat', {
+    const response = await fetch('http://localhost:8001/api/openai-chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

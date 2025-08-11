@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
+import { buttonStyles, typography } from '../utils/designSystem';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,7 +35,7 @@ const Navbar = () => {
           {/* Left: Manova Text Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
-              <span className="text-4xl italic font-script text-[#1e3a8a]">
+              <span className="text-4xl italic font-script text-blue-900">
                 Manova
               </span>
             </Link>
@@ -46,10 +47,10 @@ const Navbar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className="text-base text-[#111827] hover:text-[#1e3a8a] transition-colors relative group"
+                className="text-base text-slate-900 hover:text-blue-700 transition-colors relative group"
               >
                 {item.name}
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#1e3a8a] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out"></span>
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-in-out"></span>
               </Link>
             ))}
           </div>
@@ -58,12 +59,12 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-4">
             {currentUser ? (
               <>
-                <span className="text-sm text-[#111827] font-medium truncate max-w-xs" title={currentUser.email}>
+                <span className="text-sm text-slate-900 font-medium truncate max-w-xs" title={currentUser.email}>
                   {currentUser.email}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-[#111827] hover:text-[#1e3a8a] font-medium transition-colors"
+                  className="text-sm text-slate-900 hover:text-blue-700 font-medium transition-colors"
                 >
                   Logout
                 </button>
@@ -72,13 +73,13 @@ const Navbar = () => {
               <div className="flex items-center space-x-4">
                 <Link 
                   to="/login" 
-                  className="text-sm text-[#111827] hover:text-[#1e3a8a] font-medium transition-colors"
+                  className="text-sm text-slate-900 hover:text-blue-700 font-medium transition-colors"
                 >
                   Log In
                 </Link>
                 <Link 
                   to="/signup" 
-                  className="text-sm bg-[#1e3a8a] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#1e40af] transition-colors"
+                  className={`${buttonStyles.primary} text-sm`}
                 >
                   Sign Up
                 </Link>

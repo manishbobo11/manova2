@@ -1,4 +1,4 @@
-import React, { useEffect, memo, useMemo, useState } from 'react';
+import React, { useEffect, memo, useMemo, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, 
@@ -12,8 +12,9 @@ import {
   Smile
 } from 'lucide-react';
 import { useWellnessChat } from '../hooks/useWellnessChat';
+import { useChatSession } from '../contexts/ChatSessionContext';
 
-const SarthiChatbox = ({ userId, onNewChat }) => {
+const SarthiChatbox = ({ userId, onNewChat, onClose }) => {
   const {
     inputValue,
     isInitialized,
@@ -30,8 +31,17 @@ const SarthiChatbox = ({ userId, onNewChat }) => {
     startNewChat,
     initializeChat,
     canSend,
-    isConnected
+    isConnected,
+    language,
+    changeLanguage,
+    uiLanguageChoice,
+    sessionLanguage,
+    setUiLanguageChoice
   } = useWellnessChat(userId);
+
+  // Access sendMessage directly for quick reply chips without changing existing handlers
+  const { sendMessage } = useChatSession();
+  const firstSentRef = React.useRef(false);
 
   // Initialize chat on mount
   useEffect(() => {
@@ -57,23 +67,92 @@ const SarthiChatbox = ({ userId, onNewChat }) => {
     }
   }, [isConnected, inputValue]);
 
+  const sessionLangPill = useMemo(() => {
+    if (!sessionLanguage) return 'Auto';
+    if (sessionLanguage.toLowerCase() === 'english') return 'EN';
+    if (sessionLanguage.toLowerCase() === 'hindi') return 'HI';
+    if (sessionLanguage.toLowerCase() === 'hinglish') return 'Hinglish';
+    return sessionLanguage;
+  }, [sessionLanguage]);
+
+  const handleQuickReply = useCallback(async (text) => {
+    try {
+      await sendMessage(text);
+    } catch (e) {
+      // no-op UI change
+    }
+  }, [sendMessage]);
+
+  const lastMessage = uniqueMessages[uniqueMessages.length - 1];
+  const showQuickChips = !isTyping && !inputValue && lastMessage && lastMessage.type !== 'user';
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-rose-50/30 via-white to-sky-50/30">
-      
-      {/* Messages Container */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b">
+        <div className="px-4 md:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden on-brand bg-blue-600">
+              <img src="/images/mascot.svg" alt="Sarthi Avatar" className="w-8 h-8 md:w-10 md:h-10 object-cover" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm md:text-base font-semibold text-slate-900 truncate">Sarthi — Your Emotional Wellness Companion</h2>
+              <p className="text-xs md:text-sm text-slate-600">Here to listen, understand, and support.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+              {sessionLangPill}
+            </span>
+            <select
+              aria-label="Language"
+              value={uiLanguageChoice || 'Auto'}
+              onChange={(e) => {
+                const choice = e.target.value;
+                setUiLanguageChoice(choice);
+              }}
+              className="hidden sm:block text-xs md:text-sm bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Hinglish">Hinglish</option>
+              <option value="Auto">Auto</option>
+            </select>
+            <button
+              onClick={() => {
+                firstSentRef.current = false;
+                startNewChat();
+              }}
+              className="px-3 py-2 md:px-3 md:py-2 rounded-full text-sm font-medium text-slate-700 hover:text-slate-900 bg-transparent hover:bg-slate-100 border border-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              New Chat
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
           {/* Error Display */}
           <AnimatePresence>
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 className="bg-rose-50 border border-rose-200 rounded-2xl p-4 shadow-sm"
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-3">
                   <AlertTriangle className="h-5 w-5 text-rose-600" />
                   <div>
                     <p className="text-rose-800 font-medium">Connection Issue</p>
@@ -86,35 +165,28 @@ const SarthiChatbox = ({ userId, onNewChat }) => {
 
           {/* Messages */}
           <AnimatePresence>
-            {uniqueMessages.map((message, index) => (
-              <MessageBubble 
-                key={message.id} 
-                message={message} 
-                index={index}
-                isLast={index === uniqueMessages.length - 1}
-              />
+            {uniqueMessages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
             ))}
           </AnimatePresence>
 
-          {/* Enhanced Typing Indicator */}
-          <AnimatePresence>
-            {isTyping && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-              >
-                <TypingIndicator />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Quick reply chips below last agent message */}
+          {showQuickChips && (
+            <QuickReplyChips onSelect={handleQuickReply} />)
+          }
+
+          {/* Typing indicator */}
+          {isTyping && (
+            <div aria-live="polite">
+              <TypingIndicator />
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Enhanced Input Area */}
+      {/* Input Area */}
       <ChatInput
         inputRef={inputRef}
         inputValue={inputValue}
@@ -130,194 +202,48 @@ const SarthiChatbox = ({ userId, onNewChat }) => {
   );
 };
 
-// Enhanced Chat Header Component
-const ChatHeader = memo(({ isConnected, onNewChat, isLoading }) => (
-  <div className="flex items-center justify-between p-6 border-b border-sage-100/50 bg-gradient-to-r from-sage-50/50 to-sky-50/50 rounded-t-2xl backdrop-blur-sm">
-    <div className="flex items-center space-x-4">
-      <motion.div 
-        className="relative"
-        animate={{ scale: [1, 1.05, 1] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <div className="w-12 h-12 bg-gradient-to-br from-sage-400 to-sky-400 rounded-2xl flex items-center justify-center shadow-lg">
-          <Heart className="h-6 w-6 text-white" />
-        </div>
-        <motion.div
-          className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        />
-      </motion.div>
-      
-      <div>
-        <h2 className="text-xl font-bold bg-gradient-to-r from-sage-700 to-sky-700 bg-clip-text text-transparent font-inter">
-          Sarthi 🌱
-        </h2>
-        <p className="text-sage-600 text-sm font-semibold font-inter">Your AI wellness companion</p>
-        <div className="flex items-center space-x-2 mt-1">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-          <span className="text-xs text-sage-500 font-medium">
-            {isConnected ? 'Connected & listening' : 'Connecting...'}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <motion.button
-      onClick={onNewChat}
-      disabled={isLoading}
-      className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
-        isLoading
-          ? 'bg-sage-100 text-sage-400 cursor-not-allowed'
-          : 'bg-gradient-to-r from-sage-100 to-sky-100 text-sage-700 hover:from-sage-200 hover:to-sky-200 shadow-md hover:shadow-lg'
-      }`}
-      whileHover={!isLoading ? { scale: 1.02 } : {}}
-      whileTap={!isLoading ? { scale: 0.98 } : {}}
-    >
-      <Plus className="h-4 w-4" />
-      <span>New Chat</span>
-    </motion.button>
-  </div>
-));
-
-// Enhanced Message Bubble Component
-const MessageBubble = memo(({ message, index, isLast }) => {
+// Message Bubble Component (user/agent variants per spec)
+const MessageBubble = memo(({ message }) => {
   const isUser = message.type === 'user';
   const isSystem = message.type === 'system';
 
   if (isSystem) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, delay: index * 0.1 }}
-        className="flex justify-center"
-      >
-        <div className="bg-sage-100/50 text-sage-700 text-sm font-medium px-4 py-2 rounded-full border border-sage-200/50">
+      <div className="flex justify-center">
+        <div className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1 rounded-full border border-slate-200">
           {message.content}
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ 
-        duration: 0.4, 
-        delay: index * 0.1,
-        type: "spring",
-        stiffness: 200,
-        damping: 20
-      }}
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'} group`}
-    >
-      <div className={`flex items-start space-x-3 max-w-[85%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
-        
-        {/* Avatar */}
-        {!isUser && (
-          <motion.div 
-            className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-md ${
-              message.crisisResponse 
-                ? 'bg-gradient-to-br from-rose-400 to-pink-400' 
-                : 'bg-gradient-to-br from-sage-400 to-sky-400'
-            }`}
-            whileHover={{ scale: 1.1, rotate: 5 }}
-          >
-            {message.crisisResponse ? (
-              <AlertTriangle className="h-5 w-5 text-white" />
-            ) : (
-              <Heart className="h-5 w-5 text-white" />
-            )}
-          </motion.div>
-        )}
-
-        {/* Message Content */}
-        <div className="flex flex-col space-y-2">
-          <motion.div
-            className={`px-6 py-4 rounded-2xl border ${
-              isUser
-                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-300 shadow-md'
-                : message.crisisResponse
-                ? 'bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200 text-rose-900 shadow-sm'
-                : 'bg-neutral-50 border-gray-200 text-gray-800 shadow-md'
-            }`}
-            whileHover={{ scale: 1.01 }}
-          >
-            {/* Message Text with Emoji Support */}
-            <MessageContent content={message.content} isUser={isUser} />
-            
-            {/* Timestamp */}
-            <p className={`text-xs mt-3 ${
-              isUser ? 'text-blue-100' : 'text-gray-500'
-            }`}>
-              {message.timestamp?.toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-              })}
-            </p>
-          </motion.div>
-
-          {/* Enhanced Suggestions */}
-          {!isUser && message.suggestions && message.suggestions.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={{ delay: 0.3 }}
-              className="bg-gradient-to-br from-sky-50 to-cyan-50 border border-sky-200 rounded-2xl p-4 shadow-sm"
-            >
-              <div className="flex items-center mb-3">
-                <Brain className="h-4 w-4 text-sky-600 mr-2" />
-                <span className="text-sm font-semibold text-sky-800">Gentle suggestions ✨</span>
-              </div>
-              <div className="space-y-2">
-                {message.suggestions.map((suggestion, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * idx }}
-                    className="flex items-start space-x-2 text-sm text-sky-700"
-                  >
-                    <Sparkles className="h-3 w-3 text-sky-500 mt-0.5 flex-shrink-0" />
-                    <span>{suggestion}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Journal Prompt */}
-          {!isUser && message.journalPrompt && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={{ delay: 0.4 }}
-              className="bg-gradient-to-br from-sage-50 to-emerald-50 border border-sage-200 rounded-2xl p-4 shadow-sm"
-            >
-              <div className="flex items-center mb-2">
-                <Heart className="h-4 w-4 text-sage-600 mr-2" />
-                <span className="text-sm font-semibold text-sage-800">Journal reflection 📔</span>
-              </div>
-              <p className="text-sm text-sage-700 italic">
-                "{message.journalPrompt}"
-              </p>
-            </motion.div>
-          )}
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[78%] ${isUser ? 'text-right' : 'text-left'}`}>
+        <div className={`px-4 py-2 rounded-2xl ${
+          isUser
+            ? 'font-medium shadow-md'
+            : 'bg-white text-slate-800 border border-slate-200 shadow-sm'
+        }`}
+        style={isUser ? {
+          backgroundColor: '#2563eb',
+          color: '#ffffff'
+        } : {}}
+        >
+          <p className="leading-relaxed whitespace-pre-wrap" style={{ 
+            wordBreak: 'break-word',
+            color: isUser ? '#ffffff' : undefined
+          }}>
+            {message.content}
+          </p>
+          <p className={`text-xs mt-2`} style={{ 
+            color: isUser ? 'rgba(255, 255, 255, 0.8)' : '#9ca3af'
+          }}>
+            {message.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
         </div>
-
-        {/* User Avatar */}
-        {isUser && (
-          <motion.div 
-            className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-sky-400 to-cyan-400 rounded-2xl flex items-center justify-center shadow-md"
-            whileHover={{ scale: 1.1, rotate: -5 }}
-          >
-            <MessageCircle className="h-5 w-5 text-white" />
-          </motion.div>
-        )}
       </div>
-    </motion.div>
+    </div>
   );
 });
 
@@ -325,6 +251,11 @@ const MessageBubble = memo(({ message, index, isLast }) => {
 const MessageContent = memo(({ content, isUser }) => {
   // Simple emoji and bold text support
   const formatMessage = (text) => {
+    // Handle undefined or null text
+    if (!text || typeof text !== 'string') {
+      return 'Message content unavailable';
+    }
+    
     // Split by bold markers
     const parts = text.split(/(\*\*.*?\*\*)/g);
     
@@ -341,48 +272,24 @@ const MessageContent = memo(({ content, isUser }) => {
   };
 
   return (
-    <p className={`leading-relaxed whitespace-pre-wrap font-medium font-inter ${
-      isUser ? 'text-white' : 'text-gray-800'
-    }`} style={{ wordBreak: 'break-word' }}>
+    <p className={`leading-relaxed whitespace-pre-wrap font-medium font-inter`} 
+       style={{ 
+         wordBreak: 'break-word',
+         color: isUser ? '#ffffff' : '#1f2937'
+       }}>
       {formatMessage(content)}
     </p>
   );
 });
 
-// Enhanced Typing Indicator
+// Typing Indicator
 const TypingIndicator = memo(() => (
-  <div className="flex items-start space-x-3">
-    <motion.div 
-      className="w-10 h-10 bg-gradient-to-br from-sage-400 to-sky-400 rounded-2xl flex items-center justify-center shadow-md"
-      animate={{ scale: [1, 1.1, 1] }}
-      transition={{ duration: 1.5, repeat: Infinity }}
-    >
-      <Heart className="h-5 w-5 text-white" />
-    </motion.div>
-    
-    <div className="bg-neutral-50 border border-gray-200 rounded-3xl px-6 py-4 shadow-md">
-      <div className="flex items-center space-x-2">
-        <div className="flex space-x-1">
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              className="w-2 h-2 bg-sage-400 rounded-full"
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.5, 1, 0.5]
-              }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                delay: i * 0.2
-              }}
-            />
-          ))}
-        </div>
-        <span className="text-sm text-gray-600 font-medium ml-2">
-          Sarthi is thinking...
-        </span>
-      </div>
+  <div className="flex justify-start">
+    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-slate-100 border border-slate-200 text-slate-600 animate-pulse">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+      <span className="sr-only">Sarthi is typing…</span>
     </div>
   </div>
 ));
@@ -407,7 +314,7 @@ const EmojiPicker = memo(({ onEmojiSelect, onClose, isOpen }) => {
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-700">Pick an emoji</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <button onClick={onClose} className="text-gray-600 hover:text-gray-800">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -431,7 +338,29 @@ const EmojiPicker = memo(({ onEmojiSelect, onClose, isOpen }) => {
   );
 });
 
-// Enhanced Chat Input Component
+// Quick Reply Chips
+const QuickReplyChips = memo(({ onSelect }) => {
+  const chips = useMemo(() => [
+    'That makes sense',
+    'Tell me more',
+    'Give me a next step'
+  ], []);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {chips.map((text) => (
+        <button
+          key={text}
+          onClick={() => onSelect(text)}
+          className="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-700 font-medium hover:bg-blue-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+});
+
+// Chat Input Component (updated styles per spec)
 const ChatInput = memo(({ 
   inputRef, 
   inputValue, 
@@ -481,25 +410,23 @@ const ChatInput = memo(({
   };
 
   return (
-    <div className="border-t border-gray-200 bg-gray-50 shadow-md rounded-b-xl">
-      <div className="p-4 md:p-6">
-        <div className="flex items-end space-x-3 w-full">
-          
-          {/* Emoji Button */}
-          <div className="relative emoji-picker-container">
+    <div className="sticky bottom-0 bg-white border-t border-gray-300">
+      <div className="p-3 md:p-4">
+        <div className="flex items-end gap-2 md:gap-3 w-full">
+          {/* Optional emoji toggler retained */}
+          <div className="relative emoji-picker-container hidden md:block">
             <motion.button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${
+            className={`flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center border font-medium ${
                 showEmojiPicker 
-                  ? 'bg-blue-100 border-blue-300 text-blue-600' 
-                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-600'
-              }`}
+                  ? 'bg-blue-100 border-blue-200 text-blue-700' 
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               <Smile className="h-5 w-5" />
             </motion.button>
-            
             <AnimatePresence>
               <EmojiPicker 
                 isOpen={showEmojiPicker}
@@ -516,65 +443,51 @@ const ChatInput = memo(({
               value={inputValue}
               onChange={onInputChange}
               onKeyDown={onKeyDown}
-              placeholder={
-                isConnected 
-                  ? "Share what's on your mind... 💭" 
-                  : "Connecting to Sarthi..."
-              }
-              className="w-full px-4 py-4 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none text-gray-800 placeholder-gray-400 font-medium font-inter transition-all shadow-sm overflow-hidden"
+              placeholder={isConnected ? "Share what's on your mind..." : 'Connecting to Sarthi...'}
+              className="w-full px-5 py-3 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-slate-800 placeholder-slate-400 transition-all shadow-sm overflow-hidden"
               rows={1}
-              style={{ 
-                minHeight: '56px',
-                maxHeight: '120px',
-                overflowY: inputValue.length > 100 ? 'auto' : 'hidden',
-                boxSizing: 'border-box'
-              }}
+              style={{ minHeight: '44px', maxHeight: '140px', overflowY: inputValue.length > 100 ? 'auto' : 'hidden', boxSizing: 'border-box' }}
               disabled={!isConnected || isLoading || isTyping}
             />
-            
-            {/* Character counter for long messages */}
-            {inputValue.length > 200 && (
-              <div className="absolute bottom-3 right-4 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded">
-                {inputValue.length}/500
-              </div>
-            )}
           </div>
 
           {/* Send Button */}
           <motion.button
             onClick={onSend}
             disabled={!canSend}
-            className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md ${
-              canSend
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-            whileHover={canSend ? { scale: 1.05 } : {}}
-            whileTap={canSend ? { scale: 0.95 } : {}}
+            className={`flex-shrink-0 rounded-full px-4 py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
+            style={canSend ? {
+              backgroundColor: '#2563eb',
+              color: '#ffffff'
+            } : {
+              backgroundColor: '#e5e7eb',
+              color: '#9ca3af'
+            }}
+            whileHover={canSend ? { 
+              scale: 1.03,
+              backgroundColor: '#1d4ed8'
+            } : {}}
+            whileTap={canSend ? { scale: 0.97 } : {}}
           >
             {isLoading || isTyping ? (
-              <RotateCcw className="h-5 w-5 animate-spin" />
+              <RotateCcw className="h-5 w-5 animate-spin" style={{ color: '#ffffff' }} />
             ) : (
-              <Send className="h-5 w-5" />
+              <Send className="h-5 w-5" style={{ color: '#ffffff' }} />
             )}
           </motion.button>
         </div>
-
-        {/* Helper Text */}
-        <p className="text-xs text-gray-500 mt-3 text-center font-medium">
-          💚 This AI companion is for emotional support. In case of emergency, consult a nearby hospital or dial KIRAN Helpline 1800-599-0019.
-        </p>
+        <p className="text-[11px] text-slate-500 mt-2 text-center">This AI companion is for support. In an emergency, contact local services or KIRAN Helpline 1800-599-0019.</p>
       </div>
     </div>
   );
 });
 
 // Set display names for dev tools
-ChatHeader.displayName = 'ChatHeader';
 MessageBubble.displayName = 'MessageBubble';
 MessageContent.displayName = 'MessageContent';
 TypingIndicator.displayName = 'TypingIndicator';
 ChatInput.displayName = 'ChatInput';
+QuickReplyChips.displayName = 'QuickReplyChips';
 EmojiPicker.displayName = 'EmojiPicker';
 
 export default SarthiChatbox;

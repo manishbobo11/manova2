@@ -1,10 +1,20 @@
 import React from 'react';
 import SarthiChatbot from './SarthiChatbot';
-import { ChatProvider } from '../contexts/ChatContext';
+import { ChatSessionProvider } from '../contexts/ChatSessionContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const SarthiChatbotDemo = () => {
-  // Demo user ID - replace with actual user ID from auth
-  const demoUserId = 'demo-user-123';
+  const { currentUser } = useAuth();
+  
+  // Use actual user ID from auth, with fallback for demo
+  const userId = currentUser?.uid || 'demo-user-123';
+  
+  // Create user context for proper name extraction
+  const userContext = {
+    displayName: currentUser?.displayName || 'Demo User',
+    email: currentUser?.email || 'demo@example.com',
+    uid: userId
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4">
@@ -18,9 +28,9 @@ const SarthiChatbotDemo = () => {
           </p>
         </div>
         
-        <ChatProvider userId={demoUserId}>
-          <SarthiChatbot userId={demoUserId} />
-        </ChatProvider>
+        <ChatSessionProvider userId={userId} userContext={userContext}>
+          <SarthiChatbot userId={userId} />
+        </ChatSessionProvider>
       </div>
     </div>
   );

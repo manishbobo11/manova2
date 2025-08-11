@@ -170,7 +170,7 @@ const WellnessChat = ({ userId }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          className="bg-blue-600 text-white hover:bg-blue-700 font-medium transition px-4 py-2 rounded-lg disabled:opacity-50"
         >
           Send
         </button>

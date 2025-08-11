@@ -898,6 +898,258 @@ app.get('/api/contributors', async (req, res) => {
   }
 });
 
+// Strict language chat endpoint
+app.post('/api/gpt', async (req, res) => {
+  try {
+    const { messages, sessionLanguage, latestInsight, firstName, text, uiLanguageChoice } = req.body || {};
+    
+    // Handle sessionLanguage logic - accept from frontend payload or set from uiLanguageChoice or auto-detect
+    let effectiveSessionLanguage = sessionLanguage;
+    if (!effectiveSessionLanguage && uiLanguageChoice && uiLanguageChoice !== 'Auto') {
+      effectiveSessionLanguage = uiLanguageChoice;
+    }
+    if (!effectiveSessionLanguage && text) {
+      // Auto-detect from first message
+      const hasDevanagari = /[\u0900-\u097F]/.test(text);
+      const hasLatin = /[A-Za-z]/.test(text);
+      if (hasDevanagari && hasLatin) {
+        effectiveSessionLanguage = 'Hinglish';
+      } else if (hasDevanagari) {
+        effectiveSessionLanguage = 'Hindi';
+      } else {
+        effectiveSessionLanguage = 'English';
+      }
+    }
+    if (!effectiveSessionLanguage) {
+      effectiveSessionLanguage = 'English'; // Default fallback
+    }
+
+    console.info('[Sarthi API] payload', { 
+      sessionLanguage: effectiveSessionLanguage, 
+      firstName, 
+      hasInsight: Boolean(latestInsight) 
+    });
+
+    // Validate input
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "Invalid messages format" });
+    }
+
+    // Build enhanced system prompt with therapeutic approach
+    const contextData = latestInsight ? 
+      `- Last score: ${latestInsight.score}/10, mood: ${latestInsight.mood}
+- Stressed domains: ${(latestInsight.topDomains || []).join(", ") || "—"}
+- Last note: ${latestInsight.aiSummary || "—"}` 
+      : `No recent check-ins.`;
+
+    const systemPrompt = `You are **Sarthi** — a warm, trustworthy companion, evidence-based counselor, and solution-oriented coach for ${firstName || 'Friend'}. 
+Your job: listen deeply, normalize feelings, then help ${firstName || 'Friend'} take one doable step now.
+
+STRICT LANGUAGE RULE:
+- Reply ONLY in ${effectiveSessionLanguage}. If the user writes in another language, stay in ${effectiveSessionLanguage} and ask 
+  "Should I switch to <that language>?" Switch only on explicit yes.
+- NEVER use Hinglish unless ${effectiveSessionLanguage} === "hinglish".
+
+TONE & PERSONA:
+- Human, warm, encouraging. Sound like a wise friend who is also a trained counselor.
+- Natural, conversational lines (no sterile templates, no headers like "### Next Steps:").
+- Short paragraphs (1–3 lines), simple words. Avoid clinical jargon unless asked.
+- Use light emojis only if the user uses them (0–1 per reply). Never overdo.
+
+THERAPEUTIC SKILLS (show don't tell):
+- Reflective listening (name feeling + summarize meaning).
+- Motivational interviewing (open questions, affirm strengths).
+- CBT micro-tools (reframing thought, evidence check, behavioral activation).
+- Grounding & breath when affect is high (box breathing: 4–4–4–4; 3-2-1 senses).
+- Solution-focus: end with 1–3 **concrete**, tiny actions (1–2 lines each, with "→" bullets, not "###").
+- Always end with a gentle check-in question.
+
+CONTEXT (if provided; don't restate mechanically):
+${contextData}
+
+SAFETY:
+- If you detect self-harm, harm to others, or crisis: 
+  1) Acknowledge and validate feelings,
+  2) Encourage reaching out now, 
+  3) Provide KIRAN 1800-599-0019 (India) and local emergency guidance,
+  4) Keep tone calm and supportive.
+
+OUTPUT SHAPE (no labels, no markdown headings):
+- 2–4 short, empathic lines (mirror their situation; feel like a friend).
+- 1 follow-up question that invites a small share.
+- 1–3 tiny actions with "→" bullets. Make them realistic and time-boxed (5–10 min).
+- End with: "Want me to keep you company while you try one?" or a similar warm check-in.`;
+
+    // Add few-shot style guide examples
+    const fewShotExamples = `
+FEW-SHOT STYLE GUIDE:
+
+Example 1 (sadness):
+User: "I feel low and empty."
+Sarthi: "That sounds really heavy, and I'm glad you said it out loud. Feeling empty can show up when your brain's been carrying too much. 
+If it's okay, what's been draining you the most this week?
+→ Put a 5-minute timer and step near a window; slow inhale 4, hold 4, exhale 4, hold 4 (×4)
+→ Jot one worry + one thing you can do for 5 min
+→ Send me one word for your current feeling"
+
+Example 2 (work stress):
+User: "Work pressure is killing me."
+Sarthi: "That pressure sounds non-stop—anyone would feel squeezed. Your effort still counts, even if it isn't visible.
+What's the smallest task you could finish in 10 minutes right now?
+→ Block 10 min: pick the tiniest subtask, no polish, just start
+→ Mute notifications for 15 min
+→ After: say 'done' here and we'll pick the next tile together"
+
+MICRO-TOOLS READY:
+- Box breathing 4-4-4-4, 3-2-1 grounding, 5-minute body scan cue, reframing ("What evidence supports this thought?"), 
+  tiny behavioral activation ("2-minute start"), "If it takes <2 min, do now".
+
+FORMATTING RULES:
+- Strip "###", "Next Steps:", numbered scaffolds like "1." at the end unless user requests a list.
+- Bullets must be "→" and 1 short line each.
+- Final line always a question or offer of presence.
+- Soft cap ~110 words unless the user asks for more.`;
+
+    // Inject enhanced system prompt with examples
+    const fullSystemPrompt = systemPrompt + fewShotExamples;
+    const finalMessages = [{ role: 'system', content: fullSystemPrompt }, ...messages];
+
+    // Azure OpenAI configuration
+    const azureKey = process.env.AZURE_OPENAI_API_KEY || "6Teijvr6VDdNQ9WT6f1JdHVdqhfuTkyrLeRDbsa5K7DcwiwKkdeWJQQJ99BEACYeBjFXJ3w3AAABACOGYB7D";
+    const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://manova.openai.azure.com/";
+    const azureDeployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o";
+    const azureVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview";
+
+    // Send to Azure OpenAI
+    const endpoint = `${azureEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=${azureVersion}`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": azureKey
+      },
+      body: JSON.stringify({
+        messages: finalMessages,
+        temperature: 0.6, // Balanced for warmth + consistency
+        max_tokens: 200,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Azure API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    let draftReply = data.choices[0].message.content;
+    
+    // Self-critique step for quality improvement
+    const critiquePrompt = `Review this therapeutic response draft and improve it if needed. 
+Return ONLY the improved reply text - no commentary, no "Here's a revised version", just the direct response to the user.
+If the draft is already good, return it unchanged.
+
+Draft: ${draftReply}`;
+    
+    let finalReply = draftReply; // Default to original draft
+    
+    const critiqueResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": azureKey
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: 'You are a quality reviewer. Return only the improved therapeutic response text, no meta-commentary.' },
+          { role: 'user', content: critiquePrompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 200,
+      })
+    });
+    
+    if (critiqueResponse.ok) {
+      const critiqueData = await critiqueResponse.json();
+      const critiqueOutput = critiqueData.choices[0].message.content?.trim();
+      
+      // Extract clean revised version - avoid meta-commentary
+      if (critiqueOutput && 
+          critiqueOutput.length > 20 && 
+          !critiqueOutput.toLowerCase().includes('here\'s') && 
+          !critiqueOutput.toLowerCase().includes('revised version') &&
+          !critiqueOutput.toLowerCase().includes('improvement')) {
+        finalReply = critiqueOutput;
+        console.info('[Sarthi] Used self-critique improved response');
+      } else {
+        console.info('[Sarthi] Kept original draft response');
+      }
+    }
+    
+    let reply = finalReply;
+
+    // Validate language compliance and regenerate if needed
+    const validateLanguage = (reply, sessionLanguage) => {
+      if (!reply || !sessionLanguage) return true;
+      
+      const hasDevanagari = /[\u0900-\u097F]/.test(reply);
+      const latinWords = reply.match(/[A-Za-z]+/g) || [];
+      const latinWordCount = latinWords.length;
+      const hinglishTokens = /\b(yaar|chal|kya|bata|aaj\s?kal|haan|na)\b/i;
+      
+      switch (sessionLanguage.toLowerCase()) {
+        case 'english':
+          // English: Fail if contains any Devanagari chars OR banned Hinglish words
+          return !hasDevanagari && !hinglishTokens.test(reply);
+        
+        case 'hindi':
+          // Hindi: Fail if no Devanagari chars OR contains long English phrases (>6 words)
+          return hasDevanagari && latinWordCount <= 6;
+        
+        case 'hinglish':
+          // Hinglish: Must contain both scripts
+          return hasDevanagari && latinWordCount > 0;
+        
+        default:
+          return true;
+      }
+    };
+
+    if (!validateLanguage(reply, effectiveSessionLanguage)) {
+      console.warn(`[Sarthi] Language violation detected for ${effectiveSessionLanguage}, regenerating...`);
+      
+      // Re-call model with SAME prompt + super-strict instruction
+      const superStrictPrompt = systemPrompt + `\n\nRegenerate strictly in ${effectiveSessionLanguage}, no mixed language.`;
+      const strictMessages = [{ role: 'system', content: superStrictPrompt }, ...messages];
+      
+      const retryResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": azureKey
+        },
+        body: JSON.stringify({
+          messages: strictMessages,
+          temperature: 0.6, // Balanced for consistency
+          max_tokens: 200,
+        })
+      });
+      
+      const retryData = await retryResponse.json();
+      reply = retryData.choices[0].message.content;
+      console.info(`[Sarthi] Response regenerated with strict ${effectiveSessionLanguage} enforcement`);
+    }
+
+    // Return response with effective session language
+    res.status(200).json({ 
+      reply, 
+      sessionLanguage: effectiveSessionLanguage 
+    });
+
+  } catch (err) {
+    console.error("GPT Error:", err);
+    res.status(500).json({ error: "Failed to get GPT response" });
+  }
+});
+
 // Vector routes
 app.use('/api/vector', vectorRouter);
 

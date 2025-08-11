@@ -385,7 +385,50 @@ export const resetVectorContext = async (userId) => {
       })
     });
 
-    const data = await response.json();
+    // Check if response is JSON before trying to parse it
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn(`⚠️ Vector reset API returned non-JSON response (${contentType})`);
+      
+      // If it's a 404, the endpoint doesn't exist
+      if (response.status === 404) {
+        console.log('🔧 Vector reset endpoint not available (404), continuing without vector reset');
+        return { 
+          success: true, 
+          message: 'Vector reset endpoint not available, continuing with session reset',
+          skipped: true
+        };
+      }
+      
+      // If it's HTML (likely an error page), log and continue gracefully
+      if (contentType && contentType.includes('text/html')) {
+        console.log('🔧 Vector reset endpoint returned HTML (likely error page), continuing without vector reset');
+        return { 
+          success: true, 
+          message: 'Vector reset endpoint not available, continuing with session reset',
+          skipped: true
+        };
+      }
+      
+      // For other non-JSON responses, continue gracefully
+      return { 
+        success: true, 
+        message: 'Vector reset endpoint not available, continuing with session reset',
+        skipped: true
+      };
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.warn('⚠️ Failed to parse JSON response from vector reset API:', parseError);
+      return { 
+        success: true, 
+        message: 'Vector reset endpoint not available, continuing with session reset',
+        skipped: true
+      };
+    }
 
     if (!response.ok) {
       console.warn(`⚠️ Vector reset API error (${response.status}): ${data.error || 'Unknown error'}`);
@@ -430,6 +473,16 @@ export const resetVectorContext = async (userId) => {
     // If it's a network error or endpoint doesn't exist, continue gracefully
     if (error.name === 'TypeError' || error.message.includes('fetch')) {
       console.log('🔧 Vector reset endpoint not available, continuing without vector reset');
+      return { 
+        success: true, 
+        message: 'Vector reset endpoint not available, continuing with session reset',
+        skipped: true
+      };
+    }
+    
+    // If it's a JSON parse error (likely HTML response), continue gracefully
+    if (error.name === 'SyntaxError' && error.message.includes('Unexpected token')) {
+      console.log('🔧 Vector reset endpoint returned invalid JSON (likely HTML), continuing without vector reset');
       return { 
         success: true, 
         message: 'Vector reset endpoint not available, continuing with session reset',

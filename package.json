@@ -25,6 +25,7 @@
     "express": "^5.1.0",
     "firebase": "^11.10.0",
     "framer-motion": "^10.18.0",
+    "franc": "^6.2.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.10.3",
     "jspdf": "^3.0.1",
@@ -42,6 +43,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.11",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.0.3",

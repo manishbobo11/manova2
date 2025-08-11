@@ -451,7 +451,7 @@ const CommunityPage = () => {
                       {post.tags.map((tag, idx) => (
                         <span
                           key={idx}
-                          className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full text-xs"
+                          className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs"
                         >
                           {tag}
                         </span>

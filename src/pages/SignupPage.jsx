@@ -3,17 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
+import { buttonStyles, cardStyles, inputStyles, typography } from '../utils/designSystem';
 
-// CSS variables for exact Figma colors
-const cssVars = `
-  :root {
-    --primary-blue: #007CFF;
-    --primary-blue-hover: #0066CC;
-    --border-gray: #C5C5C5;
-    --text-gray: #777;
-    --border-light: #D8D8D8;
-  }
-`;
+// Design system colors (now handled by designSystem.js)
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
@@ -71,17 +63,13 @@ const SignupPage = () => {
     }
   };
 
-  // Add CSS variables on component mount
+  // Set page title
   useEffect(() => {
     document.title = 'Manova | Sign Up';
-    const style = document.createElement("style");
-    style.textContent = cssVars;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
   }, []);
 
   return (
-      <div className="flex items-center justify-center min-h-screen bg-white relative overflow-hidden">
+      <div className="flex items-center justify-center min-h-screen bg-neutral-50 relative overflow-hidden">
         {/* Animated Background Particles */}
         <motion.div
           className="w-2 h-2 bg-blue-300 rounded-full absolute top-10 left-10 opacity-60"
@@ -235,7 +223,7 @@ const SignupPage = () => {
                   transition={{ duration: 0.8, ease: 'easeOut' }}
                   className="flex justify-center items-center mb-6"
                 >
-                  <h1 className="text-5xl italic font-script text-[#1e3a8a] text-center">
+                  <h1 className="text-[48px] font-brand text-primary text-center mb-6">
                     Manova
                   </h1>
                 </motion.div>

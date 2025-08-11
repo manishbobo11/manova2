@@ -1,0 +1,60 @@
+/* Contrast utilities for brand-blue backgrounds */
+.on-brand { 
+  @apply text-white; 
+}
+
+.on-brand svg, 
+.on-brand [data-icon], 
+.on-brand path { 
+  @apply fill-white stroke-white; 
+}
+
+.on-brand .muted { 
+  @apply text-slate-100/90; 
+}
+
+.on-surface { 
+  @apply text-slate-900; 
+}
+
+.on-surface .muted { 
+  @apply text-slate-600; 
+}
+
+/* Force white text on blue buttons */
+.bg-blue-600 {
+  color: white !important;
+}
+
+.bg-blue-600 * {
+  color: white !important;
+}
+
+/* Specific button overrides */
+button.bg-blue-600,
+button.bg-blue-600 span,
+button.bg-blue-600 * {
+  color: white !important;
+}
+
+/* Motion button specific */
+[class*="bg-blue-600"] {
+  color: white !important;
+}
+
+[class*="bg-blue-600"] * {
+  color: white !important;
+}
+
+/* Wellness tool button specific */
+.wellness-tool-button {
+  color: white !important;
+}
+
+.wellness-tool-button span {
+  color: white !important;
+}
+
+.wellness-tool-button * {
+  color: white !important;
+}

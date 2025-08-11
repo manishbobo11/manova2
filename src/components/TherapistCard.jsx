@@ -360,15 +360,20 @@ const TherapistCard = ({
       <div className="px-6 pb-6">
         <motion.button
           onClick={handleBookingClick}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+          className="w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+          style={{ 
+            backgroundColor: '#2563eb',
+            color: '#ffffff'
+          }}
           whileHover={{ 
             scale: 1.02,
-            boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)"
+            boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)",
+            backgroundColor: '#1d4ed8'
           }}
           whileTap={{ scale: 0.98 }}
         >
-          <Calendar className="w-5 h-5" />
-          <span>Book Session</span>
+          <Calendar className="w-5 h-5" style={{ color: '#ffffff' }} />
+          <span style={{ color: '#ffffff' }}>Book Session</span>
         </motion.button>
       </div>
     </motion.div>

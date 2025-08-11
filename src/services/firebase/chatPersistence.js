@@ -73,7 +73,7 @@ export class ChatPersistenceService {
     try {
       const messageData = {
         role: message.type === 'user' ? 'user' : 'ai',
-        text: message.content,
+        text: message.content || message.text || '',
         timestamp: serverTimestamp(),
         messageId: message.id || generateMessageId(message.type || 'msg'),
         emotion: message.emotion || null,

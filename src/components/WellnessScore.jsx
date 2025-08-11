@@ -179,7 +179,7 @@ const WellnessScore = ({
   const [selectedInsight, setSelectedInsight] = useState(null);
   const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
 
-  // Fetch latest check-in data from Firestore
+  // Fetch latest check-in data from Firestore surveyInsights collection
   const fetchLatestCheckinData = async () => {
     if (!currentUser?.uid) {
       setError('No user logged in');
@@ -188,42 +188,61 @@ const WellnessScore = ({
     }
 
     try {
-      console.log('🔄 Fetching latest check-in data for user:', currentUser.uid);
+      console.log('🔄 Fetching latest surveyInsights data for user:', currentUser.uid);
       setLoading(true);
       setError(null);
       
-      const latestCheckin = await getLastCheckin(currentUser.uid);
+      // First try to get data from surveyInsights collection (preferred)
+      const { getUserSurveyInsights } = await import('../services/userSurveyHistory');
+      const surveyInsights = await getUserSurveyInsights(currentUser.uid);
       
-      if (!latestCheckin) {
-        console.log('⚠️ No check-in data found');
+      let latestData = null;
+      if (surveyInsights && surveyInsights.length > 0) {
+        // Use the most recent survey insight (already sorted by createdAt desc)
+        latestData = surveyInsights[0];
+        console.log('✅ Latest surveyInsights data fetched:', latestData);
+      } else {
+        // Fallback to regular checkins if no survey insights available
+        console.log('⚠️ No surveyInsights found, falling back to checkins');
+        const latestCheckin = await getLastCheckin(currentUser.uid);
+        if (latestCheckin) {
+          latestData = latestCheckin;
+          console.log('✅ Latest check-in data fetched as fallback:', latestData);
+        }
+      }
+      
+      if (!latestData) {
+        console.log('⚠️ No assessment data found');
         setCheckinData(null);
         setLoading(false);
         return;
       }
 
-      console.log('✅ Latest check-in data fetched:', latestCheckin);
-      setCheckinData(latestCheckin);
+      console.log('✅ Using assessment data:', latestData);
+      setCheckinData(latestData);
       
       // Extract and set real data
       // Ensure overallScore is a number
-      const wellnessScore = latestCheckin.wellnessScore;
+      const wellnessScore = latestData.wellnessScore;
       if (typeof wellnessScore === 'number' && !isNaN(wellnessScore)) {
         setOverallScore(wellnessScore);
       } else {
         setOverallScore(0);
       }
       // Ensure mood is a string, not an object
-      const moodData = latestCheckin.mood;
+      const moodData = latestData.mood;
       if (typeof moodData === 'object' && moodData !== null) {
         setMood('Neutral');
       } else {
         setMood(moodData || 'Neutral');
       }
       // Ensure checkinDate is a valid date
-      const timestamp = latestCheckin.timestamp;
+      const timestamp = latestData.timestamp || latestData.createdAt;
       if (timestamp) {
         try {
-          setCheckinDate(new Date(timestamp));
+          // Handle both string timestamps and Firestore Timestamp objects
+          const dateValue = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+          setCheckinDate(dateValue);
         } catch (error) {
           console.warn('Invalid timestamp:', timestamp);
           setCheckinDate(null);
@@ -232,7 +251,7 @@ const WellnessScore = ({
         setCheckinDate(null);
       }
       // Ensure emotionalSummary is a string, not an object
-      const emotionSummaryData = latestCheckin.emotionSummary;
+      const emotionSummaryData = latestData.emotionalSummary || latestData.emotionSummary;
       if (typeof emotionSummaryData === 'object' && emotionSummaryData !== null) {
         // If it's an object, extract the mood or create a summary
         const mood = emotionSummaryData.mood || 'neutral';
@@ -243,14 +262,14 @@ const WellnessScore = ({
         setEmotionalSummary(emotionSummaryData || '');
       }
       // Ensure personalizedSuggestions is an array, not an object or other type
-      const suggestionsData = latestCheckin.personalizedSuggestions;
+      const suggestionsData = latestData.recommendations || latestData.personalizedSuggestions;
       if (Array.isArray(suggestionsData)) {
         setPersonalizedSuggestions(suggestionsData);
       } else {
         setPersonalizedSuggestions([]);
       }
       // Ensure deepDiveSummaries is an object, not an array or other type
-      const deepDiveData = latestCheckin.deepDiveSummaries;
+      const deepDiveData = latestData.deepDiveSummaries;
       if (typeof deepDiveData === 'object' && deepDiveData !== null && !Array.isArray(deepDiveData)) {
         setDeepDiveSummaries(deepDiveData);
       } else {
@@ -258,23 +277,23 @@ const WellnessScore = ({
       }
       
       // Process domain scores from domainResponses or responses
-      const processedDomainScores = processDomainScores(latestCheckin);
+      const processedDomainScores = processDomainScores(latestData);
       setDomainScores(Array.isArray(processedDomainScores) ? processedDomainScores : []);
       
       // Generate dynamic recommendations and summary
-      const scoreValue = typeof latestCheckin.wellnessScore === 'number' && !isNaN(latestCheckin.wellnessScore) ? latestCheckin.wellnessScore : 0;
+      const scoreValue = typeof latestData.wellnessScore === 'number' && !isNaN(latestData.wellnessScore) ? latestData.wellnessScore : 0;
       const dynamicRecommendations = generateDynamicRecommendations(processedDomainScores, scoreValue);
       const dynamicSummary = generateDynamicSummary(scoreValue, processedDomainScores);
       
-      // Ensure recommendations is an array, not an object
-      const recommendationsData = latestCheckin.personalizedSuggestions;
+      // Use AI summary from surveyInsights if available, otherwise use recommendations
+      const recommendationsData = latestData.recommendations || latestData.personalizedSuggestions;
       if (Array.isArray(recommendationsData)) {
         setRecommendations(recommendationsData);
       } else {
         setRecommendations(dynamicRecommendations);
       }
-      // Ensure summary is a string, not an object
-      const summaryData = latestCheckin.summary;
+      // Use aiSummary from surveyInsights if available
+      const summaryData = latestData.aiSummary || latestData.summary;
       if (typeof summaryData === 'object' && summaryData !== null) {
         setSummary(dynamicSummary);
       } else {
@@ -289,8 +308,8 @@ const WellnessScore = ({
     }
   };
 
-  // Process domain scores from Firestore data
-  const processDomainScores = (checkinData) => {
+  // Process domain scores from Firestore data (surveyInsights or checkins)
+  const processDomainScores = (data) => {
     const domains = [
       { name: "Work & Career", icon: Activity },
       { name: "Personal Life", icon: Heart },
@@ -299,19 +318,35 @@ const WellnessScore = ({
       { name: "Self-Worth & Identity", icon: User }
     ];
 
-    if (checkinData.domainResponses) {
-      // Use domain responses if available
+    // If we have domainBreakdown from surveyInsights, use that (preferred)
+    if (data.domainBreakdown && typeof data.domainBreakdown === 'object') {
       return domains.map(domain => {
-        const score = checkinData.domainResponses[domain.name];
+        const domainData = data.domainBreakdown[domain.name];
+        if (domainData && typeof domainData.score === 'number') {
+          return {
+            domain: domain.name,
+            score: domainData.score, // Already in 0-100 percentage
+            insight: deepDiveSummaries[domain.name] || null
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+    // Fallback to domainResponses if available
+    else if (data.domainResponses) {
+      return domains.map(domain => {
+        const score = data.domainResponses[domain.name];
         return {
           domain: domain.name,
           score: Number(score) * 25, // Convert 0-4 scale to 0-100 percentage
           insight: deepDiveSummaries[domain.name] || null
         };
       }).filter(item => item.score !== undefined);
-    } else if (checkinData.responses) {
+    } 
+    // Final fallback to raw responses
+    else if (data.responses) {
       // Fallback: calculate from raw responses
-      const responseValues = Object.values(checkinData.responses).map(v => Number(v || 0));
+      const responseValues = Object.values(data.responses).map(v => Number(v || 0));
       const questionsPerDomain = Math.ceil(responseValues.length / domains.length);
       
       return domains.map((domain, domainIndex) => {

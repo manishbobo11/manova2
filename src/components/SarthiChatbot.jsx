@@ -3,10 +3,26 @@ import { motion } from 'framer-motion';
 import { Brain, AlertTriangle, MessageCircle, Globe, Heart, Plus } from 'lucide-react';
 import { useChatSession } from '../contexts/ChatSessionContext';
 import { getUserSettings, updateUserSettings } from '../services/firebase/userSettings';
+import { useAuth } from '../contexts/AuthContext';
 import PreviousChatsDropdown from './PreviousChatsDropdown';
 import ChatInput from './ChatInput';
 
 const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
+  // Get current authenticated user for name extraction
+  const { currentUser } = useAuth();
+  
+  // Extract user's display name with fallback logic
+  const userDisplayName = useMemo(() => {
+    if (currentUser?.displayName) {
+      return currentUser.displayName.split(' ')[0]; // First name only
+    }
+    if (currentUser?.email) {
+      const emailName = currentUser.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    return 'friend'; // Final fallback
+  }, [currentUser?.displayName, currentUser?.email]);
+
   // Chat session state from context
   const {
     messages,
@@ -203,7 +219,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
     }, [messages]);
 
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {/* Crisis alert outside of AnimatePresence to prevent re-mounting */}
         {crisisDetected && (
           <motion.div
@@ -237,7 +253,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
         
         {/* Typing indicator */}
         {(isLoading || isTyping) && (
-          <div>
+          <div aria-live="polite">
             <TypingIndicator />
           </div>
         )}
@@ -280,7 +296,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
       <div
         className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
       >
-        <div className={`flex items-start space-x-3 max-w-[80%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
+        <div className={`flex items-start space-x-3 max-w-[78%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
           {!isUser && (
             <div className={`p-2 rounded-full ${message.crisisResponse ? 'bg-red-100' : 'bg-blue-100'}`}>
               {message.crisisResponse ? (
@@ -291,16 +307,14 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
             </div>
           )}
           
-          <div
-            className={`px-4 py-3 rounded-lg ${
+          <div className={`px-4 py-3 rounded-2xl ${
               isUser
-                ? 'bg-sky-100 text-gray-900 border border-sky-200'
+                ? 'bg-blue-100 text-blue-900 shadow-sm font-medium'
                 : message.crisisResponse
                 ? 'bg-red-50 border border-red-200 text-red-900'
-                : 'bg-white border border-gray-300 text-gray-900 shadow-sm'
-            }`}
-          >
-            <p className="text-base font-medium leading-relaxed whitespace-pre-wrap" style={{ wordBreak: 'break-word' }}>
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+            <p className="text-base leading-relaxed whitespace-pre-wrap" style={{ wordBreak: 'break-word' }}>
               {message.content}
             </p>
             
@@ -335,7 +349,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
               </div>
             )}
             
-            <p className={`text-sm mt-2 ${isUser ? 'text-gray-600' : 'text-gray-700'}`}>
+            <p className={`text-xs mt-2 ${isUser ? 'text-white/80' : 'text-slate-400'}`}>
               {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
@@ -459,6 +473,24 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
       
       if (result.success) {
         console.log('✅ Message sent successfully');
+        
+        // Handle language switch notifications
+        if (result.shouldSwitchLanguage && result.switchedLanguage) {
+          const langDisplay = result.switchedLanguage === 'English' ? 'English' 
+            : result.switchedLanguage === 'Hindi' ? 'हिंदी' 
+            : 'Hinglish';
+          
+          // Show a toast notification (if available)
+          if (typeof window !== 'undefined' && window.postMessage) {
+            window.postMessage({
+              type: 'LANGUAGE_SWITCHED',
+              language: result.switchedLanguage,
+              message: `Language switched to ${langDisplay}`
+            }, '*');
+          }
+          
+          console.log(`🌐 Language switched to ${result.switchedLanguage}`);
+        }
       } else {
         console.error('❌ Failed to send message:', result.error);
         throw new Error(result.error);
@@ -536,7 +568,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
 
   // Memoized header component
   const headerContent = useMemo(() => (
-    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-50">
+    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="flex items-center space-x-3">
         <div className="p-2 rounded-full bg-blue-100">
           <Heart className="h-6 w-6 text-blue-600" />
@@ -548,7 +580,9 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        <NewChatButton />
+        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+          {language === 'Hindi' ? 'HI' : language === 'Hinglish' ? 'Hinglish' : 'EN'}
+        </span>
         <PreviousChatsDropdown
           userId={userId}
           onSessionSelect={handleSessionSelect}
@@ -556,6 +590,7 @@ const SarthiChatbot = ({ userId, resumeSessionId, onSessionLoaded }) => {
           isLoading={isLoading}
         />
         <LanguageToggle />
+        <NewChatButton />
         <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${
             currentSessionId ? 'bg-green-400' : 'bg-yellow-400'

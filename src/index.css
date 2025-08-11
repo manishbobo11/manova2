@@ -1,8 +1,52 @@
 @import '@fontsource/inter/index.css';
 @import '@fontsource/archivo/index.css';
+@import './styles/contrast.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Mental Wellness Design System CSS Variables */
+:root {
+  /* Primary Brand Colors */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  
+  /* Neutral Colors */
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+  
+  /* Wellness Accent Colors */
+  --color-accent-teal: #d1fae5;
+  --color-accent-mint: #ecfdf5;
+  --color-accent-sage: #f0fdf4;
+  
+  /* Semantic Colors */
+  --color-success-50: #f0fdf4;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-warning-50: #fffbeb;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-error-50: #fef2f2;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+}
 
 /* Custom scrollbar utilities */
 @layer utilities {
@@ -38,13 +82,13 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply text-gray-900 font-bold;
+    @apply text-slate-900 font-bold;
     font-weight: 600;
     line-height: 1.2;
   }
 
-  p, span, li, label, input, button {
-    @apply text-gray-600;
+  p, span, li, label, input {
+    @apply text-slate-600;
     line-height: 1.6;
   }
 
@@ -85,9 +129,9 @@
   }
 
   .btn-primary {
-    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: white;
-    box-shadow: 0 4px 14px 0 rgba(14, 165, 233, 0.3);
+    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.3);
   }
 
   .input {
@@ -127,19 +171,51 @@
 
 @layer components {
   .btn {
-    @apply px-6 py-2 rounded-full font-medium transition-transform shadow-md bg-gradient-to-r from-blue-400 to-blue-600 text-white hover:scale-105;
+    @apply px-6 py-2 rounded-lg font-medium transition-transform shadow-sm bg-blue-600 hover:bg-blue-700 text-white hover:scale-105;
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-blue-400 to-blue-600 text-white hover:scale-105;
+    @apply bg-blue-600 hover:bg-blue-700 text-white hover:scale-105;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-blue-600 border border-blue-600 hover:bg-blue-50 hover:scale-105;
+  }
+
+  .btn-outline {
+    @apply bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:scale-105;
   }
 
   .input {
-    @apply w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent bg-white;
+    @apply w-full px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-slate-900 placeholder-slate-500;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-md p-6;
+    @apply bg-white rounded-lg shadow-sm ring-1 ring-slate-200 p-6 transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-md hover:ring-slate-300;
+  }
+
+  .card-interactive {
+    @apply hover:shadow-md hover:ring-slate-300 cursor-pointer;
+  }
+
+  .chip {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-all duration-200;
+  }
+
+  .chip-primary {
+    @apply bg-blue-100 text-blue-700 hover:bg-blue-200;
+  }
+
+  .chip-secondary {
+    @apply bg-slate-100 text-slate-700 hover:bg-slate-200;
+  }
+
+  .chip-accent {
+    @apply bg-teal-100 text-teal-700;
   }
 
   /* Responsive grid layouts */
@@ -159,8 +235,8 @@
 
 .bg-grid-pattern {
   background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+    linear-gradient(rgba(37, 99, 235, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: center center;
 }

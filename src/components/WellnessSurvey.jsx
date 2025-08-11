@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ChevronLeft, Brain, Heart, DollarSign, Activity, User, CheckCircle, RotateCcw, MessageCircle, TrendingUp, Calendar, Phone, AlertCircle, Clock, Info, Lightbulb, Target } from 'lucide-react';
+import { buttonStyles, cardStyles, typography } from '../utils/designSystem';
 // Navbar is now handled globally in App.jsx
 import DeepDiveFollowup from './DeepDiveFollowup';
 import WellnessScore from './WellnessScore';
 import WellnessSummary from './WellnessSummary';
 import mcpService from '../services/mcp';
 import { saveDeepDiveInsight } from '../services/firebase';
-import { getCheckinHistory, saveCheckinData } from '../services/userSurveyHistory';
+import { getCheckinHistory, saveCheckinData, saveSurveyInsight } from '../services/userSurveyHistory';
 import { auth } from '../services/firebase';
 import { contextualMemoryBuilder, buildFullContext, generatePersonalizedQuestion } from '../services/userContextBuilder';
 import { generateWellnessInsights, analyzeStressLevel } from '../services/aiSuggestions';
@@ -19,6 +20,7 @@ import { upsertUserVector } from '../utils/vectorStore';
 import { getResponseEmbedding } from '../utils/embeddingService';
 import { analyzeEmotionalPatterns, performVectorCleanup, generateDeepDiveTrigger } from '../services/emotionalPatternAnalysis';
 import { processQuestionResponse } from '../services/surveySubmissionHandler';
+import { useToast } from '../contexts/ToastContext';
 
 // Import UI components from local ui directory
 import { 
@@ -37,6 +39,7 @@ import {
 // Enhanced Wellness Survey with properly aligned questions
 const WellnessSurvey = ({ userId = "demo-user-123" }) => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [currentDomain, setCurrentDomain] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [responses, setResponses] = useState({});
@@ -74,6 +77,8 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
   const [hoveredOption, setHoveredOption] = useState(null);
   const [showQuestionTransition, setShowQuestionTransition] = useState(false);
   const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionMessage, setTransitionMessage] = useState('');
   
   // Layer 1 AI Pattern Analysis State
   const [patternAnalysisResult, setPatternAnalysisResult] = useState(null);
@@ -696,7 +701,9 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
               responses: responses,
               stressScore: score,
               emotionSummary: emotionalAnalysis,
+              mood: emotionalAnalysis.mood,
               wellnessScore: score,
+              domainResponses: formatResponsesForWellnessScore(),
               domainScores: formatResponsesForWellnessScore(),
               stressAnalysis: stressAnalysis,
               deepDiveSummaries: deepDiveSummaries,
@@ -707,8 +714,11 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
             try {
               await handleSurveySubmit(surveyData);
               console.log('✅ Survey completion data saved successfully');
+              // Navigation is now handled inside handleSurveySubmit
             } catch (error) {
               console.error('❌ Error saving survey completion data:', error);
+              // On error, show results screen for manual navigation immediately
+              setShowResults(true);
             }
           }
         }
@@ -1141,7 +1151,9 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
         responses: responses,
         stressScore: score,
         emotionSummary: emotionalAnalysis,
+        mood: emotionalAnalysis.mood,
         wellnessScore: score,
+        domainResponses: formatResponsesForWellnessScore(),
         domainScores: formatResponsesForWellnessScore(),
         stressAnalysis: stressAnalysis,
         deepDiveSummaries: deepDiveSummaries,
@@ -1153,56 +1165,89 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
       try {
         await handleSurveySubmit(surveyData);
         console.log('✅ Survey completion data saved successfully');
+        // Navigation is now handled inside handleSurveySubmit
       } catch (error) {
         console.error('❌ Error saving survey completion data:', error);
-        // Don't block the UI flow if save fails
-      }
-      
-      setTimeout(() => {
+        // On error, show results screen for manual navigation immediately
         setShowResults(true);
-      }, 2000);
+      }
     }
   };
 
   const handleDeepDiveSave = async (payload) => {
     const userIdToUse = userId;
+    
     // Support both { domain, reasons, ... } and { data: { domain, reasons, ... }, ... }
-    const { domain, reasons, aiSummary, personalizedAdvice } = payload.data || payload;
+    const data = payload.data || payload;
+    const { domain, reasons, aiSummary, personalizedAdvice } = data;
+    
+    console.log('🔍 handleDeepDiveSave called with payload:', {
+      userId: userIdToUse,
+      domain,
+      reasons,
+      hasData: !!data,
+      payloadKeys: Object.keys(payload || {}),
+      dataKeys: Object.keys(data || {})
+    });
+    
     if (!userIdToUse) {
       console.warn("⚠️ Missing userId. Not saving or building context.");
       return;
     }
-    if (!domain || !reasons || !reasons.length) {
-      console.warn("⚠️ Missing data or userId. Not continuing.");
+    
+    // More flexible validation - check if we have any meaningful data
+    const hasReasons = reasons && (Array.isArray(reasons) ? reasons.length > 0 : true);
+    const hasDomain = domain && typeof domain === 'string';
+    const hasAnyData = hasDomain && (hasReasons || aiSummary || personalizedAdvice);
+    
+    if (!hasAnyData) {
+      console.warn("⚠️ Missing required data. Payload:", payload);
+      console.warn("⚠️ Extracted data:", { domain, reasons, aiSummary, personalizedAdvice });
       return;
     }
-    saveDeepDiveInsight(userIdToUse, domain, payload.data || payload);
     
-    // Persist deep dive summary in local state for WellnessScore
-    // Structure the data to match what the InsightModal expects
-    setDeepDiveSummaries(prev => ({
-      ...prev,
-      [domain]: {
-        summary: aiSummary || (personalizedAdvice && personalizedAdvice.validation) || '',
-        actionableSteps: (personalizedAdvice && personalizedAdvice.actionableSteps) || [],
-        reflectionQuestions: (personalizedAdvice && personalizedAdvice.reflectionQuestions) || [],
-        selfCompassion: (personalizedAdvice && personalizedAdvice.selfCompassion) || '',
-        // Add additional metadata for debugging
-        timestamp: new Date().toISOString(),
-        domain: domain,
-        reasons: reasons
+    // Ensure reasons is always an array
+    const safeReasons = Array.isArray(reasons) ? reasons : (reasons ? [reasons] : []);
+    
+    try {
+      await saveDeepDiveInsight(userIdToUse, domain, payload.data || payload);
+      
+      // Persist deep dive summary in local state for WellnessScore
+      // Structure the data to match what the InsightModal expects
+      setDeepDiveSummaries(prev => ({
+        ...prev,
+        [domain]: {
+          summary: aiSummary || (personalizedAdvice && personalizedAdvice.validation) || '',
+          actionableSteps: (personalizedAdvice && personalizedAdvice.actionableSteps) || [],
+          reflectionQuestions: (personalizedAdvice && personalizedAdvice.reflectionQuestions) || [],
+          selfCompassion: (personalizedAdvice && personalizedAdvice.selfCompassion) || '',
+          // Add additional metadata for debugging
+          timestamp: new Date().toISOString(),
+          domain: domain,
+          reasons: safeReasons
+        }
+      }));
+      
+      console.log('✅ Deep dive data saved successfully for domain:', domain);
+      
+      // Always proceed to next domain regardless of payload.continue
+      if (payload.continue) {
+        await goToNextDomainOrFinish(true);
       }
-    }));
-    
-    // Always proceed to next domain regardless of payload.continue
-    if (payload.continue) {
-      await goToNextDomainOrFinish(true);
+    } catch (error) {
+      console.error('❌ Error saving deep dive insight:', error);
     }
   };
 
   // 🔥 Finalize check-in save logic
   const handleSurveySubmit = async (surveyData) => {
     const userId = auth.currentUser?.uid;
+    
+    // Guard against duplicate submissions
+    if (isComplete && showResults) {
+      console.log('⚠️ Survey already submitted, skipping duplicate submission');
+      return;
+    }
     
     console.log('🔥 Survey submission initiated:', {
       userId,
@@ -1245,7 +1290,7 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
       
       const combinedResponseText = combinedAnswers.join(' | ');
       const finalDomain = domainsProcessed.length === 1 ? domainsProcessed[0] : 'multi';
-      const finalStressScore = surveyData.wellnessScore ? Math.round((10 - surveyData.wellnessScore) * 10) / 10 : 5;
+      const finalStressScore = surveyData.wellnessScore !== null && surveyData.wellnessScore !== undefined ? Math.round((10 - surveyData.wellnessScore) * 10) / 10 : null;
       
       console.log('📝 Combined check-in data:', {
         domains: domainsProcessed,
@@ -1273,7 +1318,7 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
         response: combinedResponseText,
         question: 'Complete wellness check-in summary',
         emotion: surveyData.dominantEmotion || 'mixed',
-        wellnessScore: surveyData.wellnessScore || 5,
+        wellnessScore: surveyData.wellnessScore !== null && surveyData.wellnessScore !== undefined ? surveyData.wellnessScore : null,
         domainsIncluded: domainsProcessed.join(', '),
         responseCount: Object.keys(responses).length,
         checkInType: 'complete_survey'
@@ -1302,6 +1347,101 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
       console.error('❌ Error storing complete check-in embedding:', embeddingError);
       console.warn('⚠️ Check-in saved to Firestore successfully, but vector storage failed');
       // Don't throw error - check-in is saved, vector storage is supplementary
+    }
+
+    // 💾 Save survey insights to surveyInsights collection
+    try {
+      console.log('📊 Saving survey insights...');
+      
+      // Extract domain breakdown from survey data
+      const domainBreakdown = {};
+      const stressedDomains = [];
+      
+      if (surveyData.domainScores) {
+        surveyData.domainScores.forEach(domain => {
+          domainBreakdown[domain.domain] = {
+            score: domain.score,
+            hasStress: domain.hasStress || false
+          };
+          if (domain.hasStress) {
+            stressedDomains.push(domain.domain);
+          }
+        });
+      }
+      
+      // Generate AI summary and recommendations from emotional analysis
+      let aiSummary = '';
+      let recommendations = [];
+      
+      if (surveyData.emotionSummary) {
+        if (typeof surveyData.emotionSummary === 'string') {
+          aiSummary = surveyData.emotionSummary;
+        } else if (surveyData.emotionSummary.mood) {
+          aiSummary = `Overall mood: ${surveyData.emotionSummary.mood}. ${stressedDomains.length > 0 ? `Key stress areas: ${stressedDomains.join(', ')}.` : 'Generally managing well across domains.'}`;
+        }
+      }
+      
+      // Extract recommendations from deep dive summaries
+      if (surveyData.deepDiveSummaries) {
+        Object.values(surveyData.deepDiveSummaries).forEach(summary => {
+          if (summary.suggestions && Array.isArray(summary.suggestions)) {
+            recommendations.push(...summary.suggestions);
+          }
+        });
+      }
+      
+      // Fallback recommendations based on wellness score
+      if (recommendations.length === 0) {
+        if (surveyData.wellnessScore >= 8) {
+          recommendations = ['Continue your current wellness practices', 'Share your strategies with others', 'Set new personal growth goals'];
+        } else if (surveyData.wellnessScore >= 6) {
+          recommendations = ['Focus on stress management techniques', 'Maintain regular self-care routines', 'Consider mindfulness practices'];
+        } else {
+          recommendations = ['Prioritize self-care activities', 'Seek support from trusted friends or professionals', 'Practice stress-reduction techniques'];
+        }
+      }
+      
+      const insightData = {
+        wellnessScore: surveyData.wellnessScore,
+        mood: surveyData.mood,
+        domainBreakdown,
+        stressByDomain: domainBreakdown, // Add for Dashboard compatibility
+        stressedDomains,
+        aiSummary,
+        recommendations: recommendations.slice(0, 5), // Limit to 5 recommendations
+        emotionalSummary: surveyData.emotionSummary,
+        responses: surveyData.responses,
+        stressAnalysis: surveyData.stressAnalysis,
+        deepDiveSummaries: surveyData.deepDiveSummaries
+      };
+      
+      const insightId = await saveSurveyInsight(userId, insightData);
+      console.log('✅ Survey insights saved with ID:', insightId);
+      
+    } catch (insightError) {
+      console.error('❌ Error saving survey insights:', insightError);
+      // Don't throw error - main survey data is already saved
+    }
+
+    // 🎯 Auto-redirect to dashboard after successful submission
+    console.log('✅ Survey submission complete, redirecting to dashboard...');
+    
+    // Update UI to show completion and redirect message
+    setAiMessage("Perfect! Your wellness assessment is complete. Taking you to your dashboard now...");
+    
+    // Clear loading states immediately
+    setIsAnalyzingStress(false);
+    
+    // Navigate immediately without setTimeout to prevent getting stuck
+    try {
+      navigate('/dashboard', { state: { fromCheckin: true } });
+      console.log('✅ Navigation to dashboard successful');
+      return; // Exit function after successful navigation
+    } catch (navError) {
+      console.error('❌ Navigation error:', navError);
+      // Fallback: show results screen if navigation fails
+      setShowResults(true);
+      return; // Exit function after fallback
     }
   };
 
@@ -1358,7 +1498,9 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
         responses: responses,
         stressScore: score,
         emotionSummary: emotionalAnalysis,
+        mood: emotionalAnalysis.mood,
         wellnessScore: score,
+        domainResponses: formatResponsesForWellnessScore(),
         domainScores: formatResponsesForWellnessScore(),
         stressAnalysis: stressAnalysis,
         deepDiveSummaries: deepDiveSummaries,
@@ -1370,14 +1512,12 @@ const WellnessSurvey = ({ userId = "demo-user-123" }) => {
       try {
         await handleSurveySubmit(surveyData);
         console.log('✅ Survey completion data saved successfully');
+        // Navigation is now handled inside handleSurveySubmit
       } catch (error) {
         console.error('❌ Error saving survey completion data:', error);
-        // Don't block the UI flow if save fails
-      }
-      
-      setTimeout(() => {
+        // On error, show results screen for manual navigation immediately
         setShowResults(true);
-      }, 2000);
+      }
     }
   };
 
@@ -1852,9 +1992,25 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
   };
 
   const handleContinueFromInsight = async () => {
+    // Start transition with loading message
+    setIsTransitioning(true);
+    setTransitionMessage('🧠 Analyzing your response and preparing personalized support…');
+    
+    // Hide current insight
     setShowDomainInsight(false);
     setCurrentDomainInsight(null);
-            await goToNextDomainOrFinish(false, true); // Skip domain insight since it was already shown
+    
+    // Show loading for 1.5-2 seconds
+    await new Promise(resolve => setTimeout(resolve, 1750));
+    
+    // Scroll to top for better UX
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Clear transition and continue to next domain
+    setIsTransitioning(false);
+    setTransitionMessage('');
+    
+    await goToNextDomainOrFinish(false, true); // Skip domain insight since it was already shown
   };
 
   if (showResults) {
@@ -2033,6 +2189,21 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
   // Add wellness insights if available
   if (wellnessInsights?.insight) {
     personalizationMessage = wellnessInsights.insight;
+  }
+
+  // Show transition loading screen
+  if (isTransitioning) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-6 p-8">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto"></div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-gray-800">{transitionMessage}</h2>
+            <p className="text-gray-600">Please wait while we prepare your next questions...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Add the AI Insight component after the main survey content
@@ -2243,7 +2414,13 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
               </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <motion.div
+                key={`${currentDomain}-${currentQuestion}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <CardContent className="space-y-4">
                 {/* AI Insight Message */}
                 {aiMessage && (
                   <motion.div
@@ -2495,7 +2672,8 @@ Generate a question for ${domain}, question #${questionIndex + 1}, that is highl
                     Reason: {stressAnalysis[currentQ.id].reason || stressAnalysis[currentQ.id].enhanced?.reason}
                   </div>
                 )}
-              </CardContent>
+                </CardContent>
+              </motion.div>
             </Card>
           </div>
 

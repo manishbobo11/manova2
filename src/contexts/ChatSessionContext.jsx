@@ -9,6 +9,8 @@ import { ChatEngine } from '../services/ai/ChatEngine';
 import { generateMessageId } from '../utils/messageId';
 import { resetVectorContext } from '../utils/vectorStore';
 import { ContextStore } from '../services/firebase';
+import getFirstName from '../utils/getFirstName';
+import { detectMessageLanguage } from '../utils/languageDetection';
 
 // Action types
 const ACTIONS = {
@@ -22,7 +24,54 @@ const ACTIONS = {
   SET_TYPING: 'SET_TYPING',
   CLEAR_SESSION: 'CLEAR_SESSION',
   SET_INTRO_SENT: 'SET_INTRO_SENT',
-  SET_SESSION_INITIALIZED: 'SET_SESSION_INITIALIZED'
+  SET_SESSION_INITIALIZED: 'SET_SESSION_INITIALIZED',
+  DETECT_INITIAL_LANGUAGE: 'DETECT_INITIAL_LANGUAGE',
+  SET_UI_LANGUAGE_CHOICE: 'SET_UI_LANGUAGE_CHOICE',
+  SET_SESSION_LANGUAGE: 'SET_SESSION_LANGUAGE',
+  SET_FIRST_NAME: 'SET_FIRST_NAME',
+  SET_FIRST_MESSAGE_SENT: 'SET_FIRST_MESSAGE_SENT'
+};
+
+// Helper functions for localStorage
+const STORAGE_KEY_CHOICE = 'sarthi_lang_choice';
+const STORAGE_KEY_SESSION = 'sarthi_session_lang';
+
+const getStoredLanguageChoice = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY_CHOICE) || 'Auto';
+  } catch (error) {
+    console.warn('Failed to read uiLanguageChoice from localStorage:', error);
+    return 'Auto';
+  }
+};
+
+const getStoredSessionLanguage = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY_SESSION) || null;
+  } catch (error) {
+    console.warn('Failed to read sessionLanguage from localStorage:', error);
+    return null;
+  }
+};
+
+const setStoredLanguageChoice = (choice) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_CHOICE, choice);
+  } catch (error) {
+    console.warn('Failed to write uiLanguageChoice to localStorage:', error);
+  }
+};
+
+const setStoredSessionLanguage = (language) => {
+  try {
+    if (language === null) {
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+    } else {
+      localStorage.setItem(STORAGE_KEY_SESSION, language);
+    }
+  } catch (error) {
+    console.warn('Failed to write sessionLanguage to localStorage:', error);
+  }
 };
 
 // Initial state
@@ -32,7 +81,11 @@ const initialState = {
   isLoading: false,
   isTyping: false,
   error: null,
-  language: 'English',
+  language: 'English', // Legacy compatibility
+  uiLanguageChoice: getStoredLanguageChoice(),
+  sessionLanguage: getStoredSessionLanguage(),
+  firstName: null,
+  firstMessageSent: false,
   sessionData: null,
   chatEngine: null,
   hasSentIntro: false,
@@ -106,15 +159,47 @@ function chatSessionReducer(state, action) {
       };
 
     case ACTIONS.SET_LANGUAGE:
+      // Legacy compatibility - persist language to localStorage
+      setStoredSessionLanguage(action.payload);
       return {
         ...state,
-        language: action.payload
+        language: action.payload,
+        sessionLanguage: action.payload
+      };
+
+    case ACTIONS.SET_UI_LANGUAGE_CHOICE:
+      setStoredLanguageChoice(action.payload);
+      return {
+        ...state,
+        uiLanguageChoice: action.payload
+      };
+
+    case ACTIONS.SET_SESSION_LANGUAGE:
+      setStoredSessionLanguage(action.payload);
+      return {
+        ...state,
+        sessionLanguage: action.payload
+      };
+
+    case ACTIONS.SET_FIRST_NAME:
+      return {
+        ...state,
+        firstName: action.payload
+      };
+
+    case ACTIONS.SET_FIRST_MESSAGE_SENT:
+      return {
+        ...state,
+        firstMessageSent: action.payload
       };
 
     case ACTIONS.CLEAR_SESSION:
       return {
         ...initialState,
         language: state.language,
+        uiLanguageChoice: state.uiLanguageChoice,
+        sessionLanguage: state.sessionLanguage,
+        firstName: state.firstName,
         chatEngine: state.chatEngine,
         hasSentIntro: false  // Reset intro flag when clearing session
       };
@@ -140,11 +225,19 @@ function chatSessionReducer(state, action) {
 const ChatSessionContext = createContext();
 
 // Provider component
-export const ChatSessionProvider = ({ children, userId }) => {
+export const ChatSessionProvider = ({ children, userId, userContext = null }) => {
   const [state, dispatch] = useReducer(chatSessionReducer, {
     ...initialState,
     chatEngine: new ChatEngine()
   });
+
+  // Initialize firstName on mount
+  useEffect(() => {
+    if (userContext) {
+      const firstName = getFirstName(userContext);
+      dispatch({ type: ACTIONS.SET_FIRST_NAME, payload: firstName });
+    }
+  }, [userContext]);
 
   // Save message to Firestore with retry logic
   const saveMessageToFirestore = useCallback(async (message) => {
@@ -206,31 +299,52 @@ export const ChatSessionProvider = ({ children, userId }) => {
         );
       }
 
+      // Reset first message sent flag
+      dispatch({ type: ACTIONS.SET_FIRST_MESSAGE_SENT, payload: false });
+
       let initialMessage = null;
 
       // Only generate intro message if not already sent and not skipping
       if (!state.hasSentIntro && !skipIntro) {
         console.log('🎯 Generating first message for new session');
+
+        // Pure language greetings (no cross-language fillers)
+        const greetings = {
+          English: (name) => `Hey ${name}, how have you been feeling lately? I'm here with you.`,
+          Hindi: (name) => `नमस्ते ${name}, आप कैसा महसूस कर रहे हैं? मैं यहाँ हूँ आपके साथ।`,
+          Hinglish: (name) => `Arre ${name}, kaise ho? Kya chal raha hai? Main yahin hoon — baat shuru karein?`,
+          Auto: (name) => `Hey ${name}, I'm here with you. Type a message and I'll follow your language.`
+        };
         
-        // Get personalized first message
-        const firstMessageResponse = await state.chatEngine.getFirstMessage({
-          userId: userId,
-          language: language
-        });
+        // Determine greeting language based on dropdown choice (strict pipeline)
+        let greetingLanguage;
+        if (state.uiLanguageChoice !== 'Auto') {
+          greetingLanguage = state.uiLanguageChoice;
+          dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: state.uiLanguageChoice });
+        } else {
+          // Auto mode - neutral greeting, sessionLanguage remains null until first user message
+          greetingLanguage = 'Auto';
+          dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: null });
+        }
+
+        const firstName = state.firstName || getFirstName(userContext || {});
+        const greetingBuilder = greetings[greetingLanguage] || greetings['English'];
+        const greetingText = greetingBuilder(firstName);
 
         initialMessage = {
           id: generateMessageId('ai'),
           type: 'ai',
-          content: firstMessageResponse.message,
+          content: greetingText,
           timestamp: new Date(),
-          emotion: firstMessageResponse.emotion || 'supportive',
-          summary: firstMessageResponse.summary || '',
-          suggestions: firstMessageResponse.suggestions || [],
-          journalPrompt: firstMessageResponse.journalPrompt || '',
-          moodContext: firstMessageResponse.moodContext || '',
+          emotion: 'supportive',
+          summary: '',
+          suggestions: [],
+          journalPrompt: '',
+          moodContext: '',
           saved: false
         };
 
+        console.info('[Sarthi] NewChat', { uiLanguageChoice: state.uiLanguageChoice, sessionLanguage: greetingLanguage === 'Auto' ? null : greetingLanguage });
         // Mark intro as sent
         dispatch({ type: ACTIONS.SET_INTRO_SENT, payload: true });
       } else {
@@ -336,7 +450,7 @@ export const ChatSessionProvider = ({ children, userId }) => {
     } finally {
       dispatch({ type: ACTIONS.SET_LOADING, payload: false });
     }
-  }, [userId, state.language, createNewSession]);
+  }, [userId, state.chatEngine, state.currentSessionId, state.firstName, state.hasSentIntro, state.sessionLanguage, state.uiLanguageChoice, userContext, createNewSession]);
 
   // Send message
   const sendMessage = async (messageText) => {
@@ -347,6 +461,42 @@ export const ChatSessionProvider = ({ children, userId }) => {
       }
 
       dispatch({ type: ACTIONS.SET_TYPING, payload: true });
+
+      // Check if this is the first user message for language detection
+      const userMessages = state.messages.filter(msg => msg.type === 'user');
+      const isFirstUserMessage = userMessages.length === 0;
+      
+      // Detect language switch requests
+      const lowerMessage = messageText.toLowerCase();
+      let languageSwitchRequest = null;
+      if (lowerMessage.includes('reply in english') || lowerMessage.includes('english please') || lowerMessage.includes('switch to english')) {
+        languageSwitchRequest = 'English';
+      } else if (lowerMessage.includes('reply in hindi') || lowerMessage.includes('hindi please') || lowerMessage.includes('switch to hindi')) {
+        languageSwitchRequest = 'Hindi';
+      } else if (lowerMessage.includes('reply in hinglish') || lowerMessage.includes('hinglish please') || lowerMessage.includes('switch to hinglish')) {
+        languageSwitchRequest = 'Hinglish';
+      }
+
+      // Strict first user message detection (Auto mode only)
+      if (isFirstUserMessage && state.uiLanguageChoice === 'Auto' && state.sessionLanguage === null) {
+        // Simple detection logic as per requirements
+        const hasDevanagari = /[\u0900-\u097F]/.test(messageText);
+        const hasLatin = /[A-Za-z]/.test(messageText);
+        
+        let detectedLanguage;
+        if (hasDevanagari && hasLatin) {
+          detectedLanguage = 'Hinglish';
+        } else if (hasDevanagari) {
+          detectedLanguage = 'Hindi';
+        } else {
+          detectedLanguage = 'English';
+        }
+        
+        console.info('[Sarthi] STRICT language detection on first message:', detectedLanguage);
+        dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: detectedLanguage });
+        dispatch({ type: ACTIONS.SET_LANGUAGE, payload: detectedLanguage }); // Legacy compatibility
+        dispatch({ type: ACTIONS.SET_FIRST_MESSAGE_SENT, payload: true });
+      }
 
       // Add user message with unique ID
       const userMessage = {
@@ -362,13 +512,37 @@ export const ChatSessionProvider = ({ children, userId }) => {
       // Ensure unique timestamps and prevent race conditions
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Generate AI response
+      // Determine effective language for this send
+      const langToUse = state.sessionLanguage || (state.uiLanguageChoice !== 'Auto' ? state.uiLanguageChoice : 'English');
+
+      const firstName = state.firstName || getFirstName(userContext || {});
+      // Note: latestInsight is handled by ChatEngine internally
+      
+      // Trace logging as required
+      console.info('[Sarthi] POST /api/chat', { 
+        sessionLanguage: langToUse, 
+        uiLanguageChoice: state.uiLanguageChoice, 
+        hasInsight: true 
+      });
+      // Generate AI response with current language and language switch info
       const response = await state.chatEngine.generateResponse({
         userMessage: messageText,
         userId,
-        language: state.language,
-        conversationHistory: [...state.messages, userMessage] // Include the new user message
+        language: langToUse,
+        conversationHistory: [...state.messages, userMessage], // Include the new user message
+        userContext: userContext,
+        languageSwitchRequest, // Pass language switch request to backend
+        firstName // Pass firstName for personalization
       });
+
+      // Handle language switch response
+      if (response.shouldSwitchLanguage) {
+        const newLanguage = response.shouldSwitchLanguage;
+        dispatch({ type: ACTIONS.SET_UI_LANGUAGE_CHOICE, payload: newLanguage });
+        dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: newLanguage });
+        dispatch({ type: ACTIONS.SET_LANGUAGE, payload: newLanguage }); // Legacy compatibility
+        console.info('[Sarthi] Language switched to', newLanguage);
+      }
 
       // Add AI response with unique ID
       const aiMessage = {
@@ -398,7 +572,9 @@ export const ChatSessionProvider = ({ children, userId }) => {
         }, 2000);
       }
 
-      return { success: true };
+      return { 
+        success: true
+      };
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -410,9 +586,37 @@ export const ChatSessionProvider = ({ children, userId }) => {
   };
 
   // Change language
+  // Language management functions
+  const setUiLanguageChoice = (choice) => {
+    console.info('[Sarthi] STRICT setUiLanguageChoice', choice);
+    dispatch({ type: ACTIONS.SET_UI_LANGUAGE_CHOICE, payload: choice });
+    
+    // Strict pipeline: If choice is not Auto, immediately set sessionLanguage
+    if (choice !== 'Auto') {
+      console.info('[Sarthi] STRICT setSessionLanguage (dropdown-first)', choice);
+      dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: choice });
+      dispatch({ type: ACTIONS.SET_LANGUAGE, payload: choice }); // Legacy compatibility
+    } else {
+      // Auto mode: clear sessionLanguage until first user message
+      console.info('[Sarthi] STRICT Auto mode - clearing sessionLanguage until first message');
+      dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: null });
+    }
+  };
+
+  const setSessionLanguage = (language) => {
+    console.info('[Sarthi] setSessionLanguage', language);
+    dispatch({ type: ACTIONS.SET_SESSION_LANGUAGE, payload: language });
+    dispatch({ type: ACTIONS.SET_LANGUAGE, payload: language }); // Legacy compatibility
+  };
+
+  // Legacy changeLanguage function for backward compatibility
   const changeLanguage = async (newLanguage) => {
     try {
       dispatch({ type: ACTIONS.SET_LANGUAGE, payload: newLanguage });
+      try {
+        localStorage.setItem('sarthi_lang', newLanguage);
+        console.info('[Sarthi] setLang', newLanguage);
+      } catch { /* ignore */ }
 
       // Update session metadata
       if (state.currentSessionId) {
@@ -536,6 +740,8 @@ export const ChatSessionProvider = ({ children, userId }) => {
     loadSession,
     sendMessage,
     changeLanguage,
+    setUiLanguageChoice,
+    setSessionLanguage,
     getChatHistory,
     clearSession,
     resetSession,

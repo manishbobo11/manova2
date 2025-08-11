@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Bell } from 'lucide-react';
+import { Menu, X, Bell, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUserCheckins } from '../../services/userSurveyHistory';
+import FeedbackModal from '../FeedbackModal';
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [checkinDue, setCheckinDue] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Handle feedback modal
+  const openFeedbackForm = () => {
+    setIsFeedbackOpen(true);
+  };
 
   // Check for check-in due notification
   useEffect(() => {
@@ -66,9 +73,11 @@ const Navbar = () => {
   // Navigation links for authenticated users
   const authenticatedNavigation = [
     { name: 'Dashboard', href: '/dashboard' },
+    { name: 'Survey Insights', href: '/survey-insight' },
     { name: 'Survey', href: '/survey' },
     { name: 'Articles', href: '/articles' },
     { name: 'Community', href: '/community' },
+    { name: 'Feedback', href: '#', action: openFeedbackForm },
   ];
 
   // Navigation links for landing page (unauthenticated users)
@@ -100,17 +109,28 @@ const Navbar = () => {
             {currentUser ? (
               // Authenticated user navigation
               authenticatedNavigation.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.href}
-                  className={`text-[18px] font-semibold text-[#111827] hover:text-[#2563EB] transition duration-200 ${
-                    isActiveLink(link.href)
-                      ? 'text-[#2563EB]'
-                      : ''
-                  }`}
-                >
-                  {link.name}
-                </Link>
+                link.action ? (
+                  <button
+                    key={link.name}
+                    onClick={link.action}
+                    className="text-[18px] font-semibold text-[#111827] hover:text-[#2563EB] transition duration-200 flex items-center space-x-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>{link.name}</span>
+                  </button>
+                ) : (
+                  <Link
+                    key={link.name}
+                    to={link.href}
+                    className={`text-[18px] font-semibold text-[#111827] hover:text-[#2563EB] transition duration-200 ${
+                      isActiveLink(link.href)
+                        ? 'text-[#2563EB]'
+                        : ''
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                )
               ))
             ) : (
               // Landing page navigation
@@ -243,17 +263,30 @@ const Navbar = () => {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
                       >
-                        <Link
-                          to={link.href}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className={`block py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
-                            isActiveLink(link.href)
-                              ? 'text-[#2563EB] bg-gray-50'
-                              : 'text-gray-700 hover:text-[#2563EB] hover:bg-blue-100'
-                          }`}
-                        >
-                          {link.name}
-                        </Link>
+                        {link.action ? (
+                          <button
+                            onClick={() => {
+                              link.action();
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center space-x-3 py-3 px-4 rounded-lg font-medium transition-all duration-300 text-gray-700 hover:text-[#2563EB] hover:bg-blue-100 text-left"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>{link.name}</span>
+                          </button>
+                        ) : (
+                          <Link
+                            to={link.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={`block py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                              isActiveLink(link.href)
+                                ? 'text-[#2563EB] bg-gray-50'
+                                : 'text-gray-700 hover:text-[#2563EB] hover:bg-blue-100'
+                            }`}
+                          >
+                            {link.name}
+                          </Link>
+                        )}
                       </motion.div>
                     ))
                   ) : (
@@ -330,6 +363,12 @@ const Navbar = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackOpen} 
+        onClose={() => setIsFeedbackOpen(false)} 
+      />
     </>
   );
 };

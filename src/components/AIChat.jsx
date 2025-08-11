@@ -1,27 +1,41 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Brain, AlertTriangle, Heart, MessageCircle, Bot } from 'lucide-react';
 import { enhancedAIConversationalAgent, detectCrisisIntervention } from '../services/ai/conversationalAgent';
+import { useAuth } from '../contexts/AuthContext';
 
 const AIChat = ({ userId }) => {
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [crisisDetected, setCrisisDetected] = useState(false);
   const messagesEndRef = useRef(null);
 
+  const getUserDisplayName = useMemo(() => {
+    if (currentUser?.displayName) {
+      return currentUser.displayName.split(' ')[0];
+    }
+    if (currentUser?.email) {
+      const emailName = currentUser.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    return 'friend';
+  }, [currentUser?.displayName, currentUser?.email]);
+
   useEffect(() => {
-    // Initial greeting message
+    // Initial greeting message with user's name
+    const userName = getUserDisplayName;
     setMessages([
       {
         id: 1,
         type: 'ai',
-        content: "Hello! I'm Sarthi, your emotionally intelligent wellness companion. I'm here to listen, support, and guide you through your journey like a calm, understanding friend. How are you feeling today?",
+        content: `Hi ${userName}! 😊 How are you doing today? I'm Sarthi, your emotionally intelligent wellness companion. I'm here to listen, support, and guide you through your journey like a calm, understanding friend.`,
         timestamp: new Date(),
         emotion: 'supportive'
       }
     ]);
-  }, []);
+  }, [getUserDisplayName]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -29,7 +43,7 @@ const AIChat = ({ userId }) => {
     }
   }, [messages.length]);
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage = {
@@ -78,16 +92,16 @@ const AIChat = ({ userId }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [inputMessage, isLoading, messages, userId, crisisDetected]);
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const MessageBubble = ({ message }) => {
+  const MessageBubble = React.memo(({ message }) => {
     const isUser = message.type === 'user';
     const isAI = message.type === 'ai';
 
@@ -132,7 +146,7 @@ const AIChat = ({ userId }) => {
         </div>
       </motion.div>
     );
-  };
+  });
 
   const CrisisAlert = () => (
     <motion.div

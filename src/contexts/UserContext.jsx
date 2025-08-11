@@ -60,7 +60,7 @@ export const UserProvider = ({ children, userId }) => {
         const dominantEmotions = extractDominantEmotions(checkins);
         
         // Determine user mood based on overall wellness score
-        const userMood = determineUserMood(lastCheckin.wellnessScore || 5);
+        const userMood = determineUserMood(lastCheckin.wellnessScore !== null && lastCheckin.wellnessScore !== undefined ? lastCheckin.wellnessScore : null);
 
         setUserData({
           lastCheckin,
@@ -160,6 +160,7 @@ export const UserProvider = ({ children, userId }) => {
 
   // Helper function to determine user mood
   const determineUserMood = (wellnessScore) => {
+    if (wellnessScore === null || wellnessScore === undefined) return 'neutral';
     if (wellnessScore >= 8) return 'thriving';
     if (wellnessScore >= 6) return 'managing well';
     if (wellnessScore >= 4) return 'needs attention';
@@ -172,7 +173,7 @@ export const UserProvider = ({ children, userId }) => {
       const newCheckins = [newCheckin, ...prev.checkinHistory];
       const newDomainScores = calculateDomainScores(newCheckin);
       const newDominantEmotions = extractDominantEmotions(newCheckins);
-      const newUserMood = determineUserMood(newCheckin.wellnessScore || 5);
+      const newUserMood = determineUserMood(newCheckin.wellnessScore !== null && newCheckin.wellnessScore !== undefined ? newCheckin.wellnessScore : null);
 
       return {
         ...prev,

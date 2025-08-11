@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Brain, 
@@ -54,7 +54,73 @@ const getEmotionIcon = (emotion) => {
 
 const sanitizeData = (data) => JSON.parse(JSON.stringify(data));
 
-// Stress contributor options for the multi-select dropdown
+// Domain-specific fallback stress contributor options for instant loading
+const domainSpecificFallbacks = {
+  "Work & Career": [
+    "Feeling overworked or stretched thin",
+    "Struggling with unclear expectations", 
+    "Not feeling appreciated or recognized",
+    "Trouble disconnecting after work",
+    "Difficulty maintaining work-life balance",
+    "Concerns about job security or career growth",
+    "Communication challenges with team",
+    "Too many meetings or interruptions"
+  ],
+  "Personal Life": [
+    "Relationship conflicts or tension",
+    "Family responsibilities overwhelming me",
+    "Lack of personal time or space",
+    "Difficulty maintaining friendships",
+    "Social isolation or loneliness",
+    "Balancing multiple personal commitments",
+    "Challenges with life transitions",
+    "Feeling disconnected from loved ones"
+  ],
+  "Financial Stress": [
+    "Monthly budget concerns",
+    "Unexpected expenses",
+    "Job security affecting finances",
+    "Debt or loan payments",
+    "Saving for future goals",
+    "Healthcare or insurance costs",
+    "Supporting family members financially",
+    "Investment or retirement worries"
+  ],
+  "Health": [
+    "Physical symptoms or pain",
+    "Sleep quality issues",
+    "Energy levels or fatigue",
+    "Exercise or activity limitations",
+    "Chronic health conditions",
+    "Medical appointments or treatments",
+    "Nutrition or eating concerns",
+    "Medication side effects"
+  ],
+  "Self-Worth & Identity": [
+    "Feeling not good enough",
+    "Comparing myself to others",
+    "Imposter syndrome",
+    "Lack of self-confidence",
+    "Uncertainty about my purpose",
+    "Perfectionism or high expectations",
+    "Fear of failure or judgment",
+    "Struggling with self-acceptance"
+  ]
+};
+
+// Generic fallback for unknown domains
+const genericFallbackOptions = [
+  "Feeling overwhelmed",
+  "Lack of control",
+  "Uncertainty about the future",
+  "Difficulty balancing priorities",
+  "Not feeling supported",
+  "Perfectionism or high expectations",
+  "Fear of disappointing others",
+  "Time management challenges"
+];
+
+// Legacy options (kept for backward compatibility)
 const stressContributorOptions = [
   { value: 'feeling_overworked', label: 'Feeling overworked or stretched thin' },
   { value: 'unclear_expectations', label: 'Struggling with unclear expectations' },
@@ -118,6 +184,11 @@ const selectStyles = {
     borderRadius: '12px',
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
   })
+};
+
+// Function to get immediate fallback options for fast dropdown loading
+const getImmediateFallbackOptions = (domainName) => {
+  return domainSpecificFallbacks[domainName] || genericFallbackOptions;
 };
 
 // --- GPT prompt utility ---
@@ -508,106 +579,7 @@ Return ONLY a JSON array of strings, no explanations:
   }
 };
 
-const generatePersonalizedSuggestions = async (questionsData, selectedDropdownValues, userReflectionText) => {
-  try {
-    setIsGeneratingSuggestions(true);
-    
-    // Prepare the data for Azure GPT
-    const questionsText = questionsData.map(q => 
-      `Question: "${q.text}"
-Answer: "${q.selectedOption || q.answerLabel}"`
-    ).join('\n\n');
-    
-    const dropdownText = selectedDropdownValues.length > 0 
-      ? `Selected stress factors: ${selectedDropdownValues.join(', ')}`
-      : 'No specific stress factors selected';
-    
-    const reflectionText = userReflectionText.trim() 
-      ? `Additional thoughts: "${userReflectionText}"`
-      : 'No additional thoughts provided';
-    
-    // REFINED LLM PROMPT: Root cause reasoning, rationale, timeframe, structured output
-    const prompt = `You are a compassionate mental wellness expert. Analyze the user's high-stress answers and stress factors below. First, reason step-by-step about the likely root causes of their stress. Then, provide 3 highly actionable, concrete steps the user can take to reduce the stress shown in their answers.
-
-For each suggestion:
-- Reference the specific stressor or situation from the user's answers
-- Justify why this action is helpful for this user's situation (1-2 sentences)
-- Specify a clear timeframe or measurable outcome (immediate, today, this week, etc.)
-- Provide a mix of immediate, short-term, and medium-term actions
-
-Output ONLY a JSON array of objects, each with 'suggestion', 'why', and 'timeframe', like this:
-[
-  {"suggestion": "...", "why": "...", "timeframe": "immediate"},
-  {"suggestion": "...", "why": "...", "timeframe": "this week"},
-  {"suggestion": "...", "why": "...", "timeframe": "short-term"}
-]
-
-User context:
-${questionsText}
-
-${dropdownText}
-${reflectionText}`;
-
-    const response = await callOpenAI(prompt);
-    
-    // Clean and parse the response
-    let cleanedResponse = response;
-    if (typeof cleanedResponse === 'string') {
-      cleanedResponse = cleanedResponse.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    }
-    
-    try {
-      const parsed = JSON.parse(cleanedResponse);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].suggestion) {
-        return parsed;
-      } else {
-        throw new Error('Invalid response structure');
-      }
-    } catch (parseError) {
-      console.error('Error parsing suggestions:', parseError);
-      // Return fallback suggestions in new structure
-      return [
-        {
-          suggestion: "Take a 5-minute break right now to write down your top concern and one small step you can take today.",
-          why: "This helps you externalize your stress and makes it easier to identify manageable actions.",
-          timeframe: "immediate"
-        },
-        {
-          suggestion: "Schedule a 15-minute 'worry time' tomorrow where you can fully process your feelings without judgment.",
-          why: "Setting aside time for your worries can prevent them from intruding on your day and gives you permission to feel without guilt.",
-          timeframe: "this week"
-        },
-        {
-          suggestion: "Identify one trusted person you can share these feelings with this week.",
-          why: "Social support is one of the most effective ways to reduce stress and gain perspective.",
-          timeframe: "this week"
-        }
-      ];
-    }
-  } catch (error) {
-    console.error('Error generating personalized suggestions:', error);
-    // Return fallback suggestions in new structure
-    return [
-      {
-        suggestion: "Practice deep breathing exercises for 5-10 minutes daily.",
-        why: "Deep breathing calms your nervous system and can quickly reduce acute stress.",
-        timeframe: "immediate"
-      },
-      {
-        suggestion: "Break down overwhelming tasks into smaller, manageable steps.",
-        why: "Small steps make big challenges feel less daunting and help you build momentum.",
-        timeframe: "this week"
-      },
-      {
-        suggestion: "Make time for activities that bring you joy and relaxation.",
-        why: "Positive experiences help counterbalance stress and improve your overall mood.",
-        timeframe: "short-term"
-      }
-    ];
-  } finally {
-    setIsGeneratingSuggestions(false);
-  }
-};
+// This function will be moved inside the component
 
 
 
@@ -655,11 +627,125 @@ const DeepDiveFollowup = ({
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   
+  // Add loader state for deep dive section
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  
+  // New states for improved UX flow
+  const [showSupportLoader, setShowSupportLoader] = useState(false);
+  const [supportGenerated, setSupportGenerated] = useState(false);
+  
+  // Refs to prevent duplicate API calls
+  const dropdownInitialized = useRef(false);
+  const supportGenerationRef = useRef(false);
+  
   // Per-question suggestion data state management
   const [questionSuggestions, setQuestionSuggestions] = useState({});
   const [questionDropdownOptions, setQuestionDropdownOptions] = useState({});
   const [questionUserInputs, setQuestionUserInputs] = useState({});
   const [questionLoadingStates, setQuestionLoadingStates] = useState({});
+
+  // Generate personalized suggestions function
+  const generatePersonalizedSuggestions = async (questionsData, selectedDropdownValues, userReflectionText) => {
+    try {
+      setIsGeneratingSuggestions(true);
+      
+      // Prepare the data for Azure GPT
+      const questionsText = questionsData.map(q => 
+        `Question: "${q.text}"
+  Answer: "${q.selectedOption || q.answerLabel}"`
+      ).join('\n\n');
+      
+      const dropdownText = selectedDropdownValues.length > 0 
+        ? `Selected stress factors: ${selectedDropdownValues.join(', ')}`
+        : 'No specific stress factors selected';
+      
+      const reflectionText = userReflectionText.trim() 
+        ? `Additional thoughts: "${userReflectionText}"`
+        : 'No additional thoughts provided';
+      
+      // REFINED LLM PROMPT: Root cause reasoning, rationale, timeframe, structured output
+      const prompt = `You are a compassionate mental wellness expert. Analyze the user's high-stress answers and stress factors below. First, reason step-by-step about the likely root causes of their stress. Then, provide 3 highly actionable, concrete steps the user can take to reduce the stress shown in their answers.
+
+  For each suggestion:
+  - Reference the specific stressor or situation from the user's answers
+  - Justify why this action is helpful for this user's situation (1-2 sentences)
+  - Specify a clear timeframe or measurable outcome (immediate, today, this week, etc.)
+  - Provide a mix of immediate, short-term, and medium-term actions
+
+  Output ONLY a JSON array of objects, each with 'suggestion', 'why', and 'timeframe', like this:
+  [
+    {"suggestion": "...", "why": "...", "timeframe": "immediate"},
+    {"suggestion": "...", "why": "...", "timeframe": "this week"},
+    {"suggestion": "...", "why": "...", "timeframe": "short-term"}
+  ]
+
+  User context:
+  ${questionsText}
+
+  ${dropdownText}
+  ${reflectionText}`;
+
+      const response = await callOpenAI(prompt);
+      
+      // Clean and parse the response
+      let cleanedResponse = response;
+      if (typeof cleanedResponse === 'string') {
+        cleanedResponse = cleanedResponse.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      }
+      
+      try {
+        const parsed = JSON.parse(cleanedResponse);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].suggestion) {
+          return parsed;
+        } else {
+          throw new Error('Invalid response structure');
+        }
+      } catch (parseError) {
+        console.error('Error parsing suggestions:', parseError);
+        // Return fallback suggestions in new structure
+        return [
+          {
+            suggestion: "Take a 5-minute break right now to write down your top concern and one small step you can take today.",
+            why: "This helps you externalize your stress and makes it easier to identify manageable actions.",
+            timeframe: "immediate"
+          },
+          {
+            suggestion: "Schedule a 15-minute 'worry time' tomorrow where you can fully process your feelings without judgment.",
+            why: "Setting aside time for your worries can prevent them from intruding on your day and gives you permission to feel without guilt.",
+            timeframe: "this week"
+          },
+          {
+            suggestion: "Identify one trusted person you can share these feelings with this week.",
+            why: "Social support is one of the most effective ways to reduce stress and gain perspective.",
+            timeframe: "this week"
+          }
+        ];
+      }
+    } catch (error) {
+      console.error('Error generating personalized suggestions:', error);
+      // Return fallback suggestions in new structure
+      return [
+        {
+          suggestion: "Practice deep breathing exercises for 5-10 minutes daily.",
+          why: "Deep breathing calms your nervous system and can quickly reduce acute stress.",
+          timeframe: "immediate"
+        },
+        {
+          suggestion: "Break down overwhelming tasks into smaller, manageable steps.",
+          why: "Small steps make big challenges feel less daunting and help you build momentum.",
+          timeframe: "this week"
+        },
+        {
+          suggestion: "Make time for activities that bring you joy and relaxation.",
+          why: "Positive experiences help counterbalance stress and improve your overall mood.",
+          timeframe: "short-term"
+        }
+      ];
+    } finally {
+      setIsGeneratingSuggestions(false);
+    }
+  };
 
   // Generate per-question suggestions function
   const generatePerQuestionSuggestions = async (question, selectedDropdownValues, userInput) => {
@@ -914,14 +1000,61 @@ Respond in this exact JSON format:
     }
   }, [isAnalyzing, isGeneratingSupport]);
 
-  // Generate empathetic lines and stress contributors for each question
+  // Immediately preload fallback options for fast dropdown loading - optimized with memoization
+  const preloadedStressContributors = useMemo(() => {
+    // Ensure questionsToShow is an array and has content
+    const questions = Array.isArray(questionsToShow) ? questionsToShow : [];
+    if (!questions.length) return {};
+    
+    const immediate = {};
+    const fallbackOptions = getImmediateFallbackOptions(domainName);
+    questions.forEach(question => {
+      immediate[question.id] = fallbackOptions;
+    });
+    console.log('🚀 DeepDiveFollowup: Preloaded stress contributors for', questions.length, 'questions with domain:', domainName);
+    return immediate;
+  }, [questionsToShow, domainName]);
+
+  // Memoized stress options lookup for performance
+  const getStressOptionsForQuestion = useCallback((questionId) => {
+    return questionStressContributors[questionId] || preloadedStressContributors[questionId] || getImmediateFallbackOptions(domainName);
+  }, [questionStressContributors, preloadedStressContributors, domainName]);
+
+  // Initial loading effect for smooth user experience
+  useEffect(() => {
+    if (questionsToShow.length > 0 && !hasLoadedOnce) {
+      setIsInitialLoading(true);
+      // Reset support states on mount
+      setShowSupportLoader(false);
+      setSupportGenerated(false);
+      
+      // Show "Analyzing your responses..." for 1.5-2 seconds
+      const loadingTimer = setTimeout(() => {
+        setIsInitialLoading(false);
+        setHasLoadedOnce(true);
+      }, 1750); // 1.75 seconds for optimal UX
+      
+      return () => clearTimeout(loadingTimer);
+    }
+  }, [questionsToShow.length, hasLoadedOnce]);
+
+  // Set immediate fallback options on mount for instant dropdown loading (with guard) - optimized
+  useEffect(() => {
+    if (Object.keys(preloadedStressContributors).length > 0 && !dropdownInitialized.current) {
+      console.log('🚀 DeepDiveFollowup: Setting immediate fallback options for fast dropdown loading', Object.keys(preloadedStressContributors).length, 'questions');
+      setQuestionStressContributors(preloadedStressContributors);
+      dropdownInitialized.current = true;
+    }
+  }, [preloadedStressContributors]);
+
+  // Generate empathetic lines and enhanced stress contributors in background (non-blocking)
   useEffect(() => {
     let cancelled = false;
-    async function generateQuestionData() {
-      if (!questionsToShow.length) return;
+    async function generateEnhancedQuestionData() {
+      if (!questionsToShow.length || !hasLoadedOnce || !dropdownInitialized.current) return;
       
       const newEmpatheticLines = {};
-      const newStressContributors = {};
+      const enhancedStressContributors = {};
       
       for (const question of questionsToShow) {
         if (cancelled) break;
@@ -935,47 +1068,60 @@ Respond in this exact JSON format:
           );
           newEmpatheticLines[question.id] = empatheticLine;
           
-          // Generate domain-specific stress contributors
-          const stressContributors = await generateDomainSpecificStressContributors(
-            question.text,
-            question.selectedOption || question.answerLabel,
-            domainName
-          );
-          newStressContributors[question.id] = stressContributors;
+          // Generate enhanced domain-specific stress contributors (background enhancement)
+          try {
+            const enhancedOptions = await generateDomainSpecificStressContributors(
+              question.text,
+              question.selectedOption || question.answerLabel,
+              domainName
+            );
+            enhancedStressContributors[question.id] = enhancedOptions;
+          } catch (aiError) {
+            console.warn(`AI enhancement failed for question ${question.id}, keeping fallback options:`, aiError);
+            // Keep the preloaded fallback options - don't overwrite with error
+          }
           
         } catch (error) {
-          console.error(`Error generating data for question ${question.id}:`, error);
-          // Set fallback values
+          console.error(`Error generating enhanced data for question ${question.id}:`, error);
+          // Set fallback empathetic line only
           newEmpatheticLines[question.id] = "I can see this is affecting you, and your feelings are completely valid.";
-          newStressContributors[question.id] = [
-            "Feeling overwhelmed",
-            "Lack of control",
-            "Uncertainty",
-            "Not feeling supported",
-            "High expectations",
-            "Difficulty balancing priorities"
-          ];
+          // Don't overwrite stress contributors - keep the preloaded fallbacks
         }
       }
       
       if (!cancelled) {
         setEmpatheticLines(newEmpatheticLines);
-        setQuestionStressContributors(newStressContributors);
+        // Only update stress contributors if we successfully got enhanced ones
+        if (Object.keys(enhancedStressContributors).length > 0) {
+          console.log('✨ DeepDiveFollowup: Enhanced AI options loaded for', Object.keys(enhancedStressContributors).length, 'questions');
+          setQuestionStressContributors(prev => ({ ...prev, ...enhancedStressContributors }));
+        }
       }
     }
     
-    generateQuestionData();
+    // Run enhancement in background - only after initial loading is complete
+    if (hasLoadedOnce) {
+      const timer = setTimeout(() => {
+        console.log('🔄 DeepDiveFollowup: Starting background AI enhancement for dropdowns');
+        generateEnhancedQuestionData();
+      }, 500);
+      
+      return () => {
+        clearTimeout(timer);
+        cancelled = true;
+      };
+    }
     
     return () => {
       cancelled = true;
     };
-  }, [questionsToShow, domainName]);
+  }, [questionsToShow, domainName, hasLoadedOnce]);
 
   // Fetch GPT deep dive options for each stressed question
   useEffect(() => {
     let cancelled = false;
     async function fetchDeepDiveOptions() {
-      if (!questionsToShow.length) return;
+      if (!questionsToShow.length || !hasLoadedOnce) return;
       const loading = {};
       questionsToShow.forEach(q => { loading[q.id] = true; });
       setLoadingOptions(loading);
@@ -1018,37 +1164,46 @@ Respond in this exact JSON format:
         setErrorOptions(errorObj);
       }
     }
-    fetchDeepDiveOptions();
+    if (hasLoadedOnce) {
+      fetchDeepDiveOptions();
+    }
     return () => { cancelled = true; };
-  }, [userId, questionsToShow]);
+  }, [userId, questionsToShow, hasLoadedOnce]);
 
   // Fetch GPT suggestions for each stressed question
 
 
-  // Generate dynamic stress contributor suggestions based on high-stress questions
-  useEffect(() => {
-    if (questionsToShow.length > 0) {
-      // Use the new dynamic stress contributor generator
-      const dynamicContributors = generateDynamicStressContributors(questionsToShow, domainName);
-      
-      // Convert to the format expected by react-select
-      const stressOptions = dynamicContributors.map(contributor => ({
-        value: contributor.value,
-        label: contributor.label
-      }));
-      
-      // Set the generated stress options as default selections (up to 3)
-      const defaultSelections = stressOptions.slice(0, 3);
-      setSelectedStressTags(defaultSelections);
-      
-      // Set all generated options for the DeepDiveUI component
-      setGeneratedStressOptions(dynamicContributors.map(c => c.label));
-      
-      console.log('🎯 Dynamic stress contributors generated:', dynamicContributors);
-      console.log('🎯 Stress options for react-select:', stressOptions);
-      console.log('🎯 Default selections:', defaultSelections);
-    }
+  // Generate dynamic stress contributor suggestions based on high-stress questions - memoized for performance
+  const dynamicStressData = useMemo(() => {
+    if (questionsToShow.length === 0) return null;
+    
+    // Use the new dynamic stress contributor generator
+    const dynamicContributors = generateDynamicStressContributors(questionsToShow, domainName);
+    
+    // Convert to the format expected by react-select
+    const stressOptions = dynamicContributors.map(contributor => ({
+      value: contributor.value,
+      label: contributor.label
+    }));
+    
+    return {
+      contributors: dynamicContributors,
+      stressOptions,
+      defaultSelections: stressOptions.slice(0, 3),
+      labels: dynamicContributors.map(c => c.label)
+    };
   }, [questionsToShow, domainName]);
+
+  useEffect(() => {
+    if (dynamicStressData) {
+      setSelectedStressTags(dynamicStressData.defaultSelections);
+      setGeneratedStressOptions(dynamicStressData.labels);
+      
+      console.log('🎯 Dynamic stress contributors generated:', dynamicStressData.contributors);
+      console.log('🎯 Stress options for react-select:', dynamicStressData.stressOptions);
+      console.log('🎯 Default selections:', dynamicStressData.defaultSelections);
+    }
+  }, [dynamicStressData]);
 
   // Helper to get flagged questions (HIGH stress only - >= 7)
   const getFlaggedQuestions = () => {
@@ -1155,6 +1310,13 @@ Respond in this exact JSON format:
     // Step 3: Log userId before saving
     console.log('Saving deep dive insight for userId:', userId);
 
+    // Show intermediate loading state before GPT generation
+    setShowSupportLoader(true);
+    setSupportGenerated(false);
+    
+    // Add small delay for smooth UX before starting GPT generation
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     try {
       // Generate personalized support message using the enhanced function
       const personalizedSupport = await buildPersonalizedSupport(
@@ -1244,6 +1406,10 @@ Respond in this JSON format:
       // Use the enhanced personalized support data
       setAiSummary(therapistSupport.supportMessage);
       
+      // Add minimum display time for loading state (1.5-2 seconds total)
+      const minLoadingTime = new Promise(resolve => setTimeout(resolve, 1500));
+      await minLoadingTime;
+      
       // Store enhanced therapist data for UI display
       setEnhancedTherapistData({
         title: therapistSupport.title,
@@ -1251,6 +1417,10 @@ Respond in this JSON format:
         actionableSteps: therapistSupport.actionableSteps,
         selfCompassion: therapistSupport.selfCompassion
       });
+      
+      // Smooth transition: hide loader and show content
+      setShowSupportLoader(false);
+      setSupportGenerated(true);
 
       // Generate personalized suggestions using Azure GPT
       try {
@@ -1330,6 +1500,8 @@ Respond in this JSON format:
       setAnalysisFeedback('There was an error saving your response. Please try again.');
       setIsAnalyzing(false);
       setIsGeneratingSupport(false);
+      setShowSupportLoader(false);
+      setSupportGenerated(false);
     }
   };
 
@@ -1528,7 +1700,7 @@ Respond in this JSON format:
   };
 
   // Handler for updating tags
-  const handleTagsChange = (questionId, tags) => {
+  const handleTagsChange = useCallback((questionId, tags) => {
     setSelectedTags(prev => ({
       ...prev,
       [questionId]: tags
@@ -1545,7 +1717,7 @@ Respond in this JSON format:
       const userInput = questionUserInputs[questionId] || '';
       handleQuestionUserInput(questionId, userInput);
     }
-  };
+  }, [questionsToShow, questionUserInputs]);
 
   // Handler for updating intensity
   const handleIntensityChange = (questionId, intensity) => {
@@ -1639,6 +1811,55 @@ Respond in this JSON format:
           </p>
           <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto" />
         </div>
+      </div>
+    );
+  }
+
+  // Show loading screen during initial analysis
+  if (isInitialLoading && questionsToShow.length > 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/30 font-body flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center p-12 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50 max-w-md mx-4"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 mx-auto mb-6"
+          >
+            <Brain className="w-16 h-16 text-blue-600" />
+          </motion.div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-4" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif' }}>
+            Analyzing your responses...
+          </h2>
+          <p className="text-slate-600 leading-relaxed">
+            Our AI is processing your survey data to provide personalized insights and support recommendations.
+          </p>
+          <motion.div 
+            className="flex justify-center space-x-1 mt-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-2 h-2 bg-blue-400 rounded-full"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.5, 1, 0.5]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: i * 0.2
+                }}
+              />
+            ))}
+          </motion.div>
+        </motion.div>
       </div>
     );
   }
@@ -1785,25 +2006,23 @@ Respond in this JSON format:
                         </div>
                       )}
 
-                      {/* 📌 Contributors Dropdown - refined with card elevation */}
-                      {questionStressContributors[q.id] && (
-                        <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-100 shadow-sm">
-                          <div className="flex items-center mb-3">
-                            <span className="mr-2">📌</span>
-                            <span className="font-medium text-orange-700 text-sm">What's Contributing to This?</span>
-                          </div>
-                          <DeepDiveUI
-                            stressOptions={questionStressContributors[q.id]}
-                            selectedStressTags={selectedTags[q.id] || []}
-                            onStressTagsChange={(tags) => handleTagsChange(q.id, tags)}
-                            maxSelections={3}
-                            placeholder="Choose stress contributors..."
-                            className="w-full"
-                            questionId={q.id}
-                            isLoading={loadingOptions[q.id] || false}
-                          />
+                      {/* 📌 Contributors Dropdown - Always rendered for instant loading */}
+                      <div className="mb-4 p-4 bg-orange-50 rounded-xl border border-orange-100 shadow-sm">
+                        <div className="flex items-center mb-3">
+                          <span className="mr-2">📌</span>
+                          <span className="font-medium text-orange-700 text-sm">What's Contributing to This?</span>
                         </div>
-                      )}
+                        <DeepDiveUI
+                          stressOptions={getStressOptionsForQuestion(q.id)}
+                          selectedStressTags={selectedTags[q.id] || []}
+                          onStressTagsChange={(tags) => handleTagsChange(q.id, tags)}
+                          maxSelections={3}
+                          placeholder={questionStressContributors[q.id] ? "Choose stress contributors..." : "Loading domain-specific options..."}
+                          className="w-full"
+                          questionId={q.id}
+                          isLoading={loadingOptions[q.id] || false}
+                        />
+                      </div>
 
                       {/* ✅ Suggestions - bulleted with green tick icons and card elevation */}
                       {(questionSuggestions[q.id] || questionLoadingStates[q.id]) && (
@@ -1947,12 +2166,63 @@ Respond in this JSON format:
 
                       {/* Enhanced Structured Support (if available) */}
                       {(() => {
+                        // Show loading state while generating support
+                        if (showSupportLoader) {
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-blue-200 shadow-lg text-center"
+                            >
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                className="w-12 h-12 mx-auto mb-4"
+                              >
+                                <Brain className="w-12 h-12 text-blue-600" />
+                              </motion.div>
+                              <h4 className="text-lg font-bold text-slate-900 mb-2" style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif' }}>
+                                🔄 Generating personalized support based on your responses…
+                              </h4>
+                              <p className="text-slate-600 text-sm">
+                                Our AI is analyzing your inputs to create tailored recommendations just for you.
+                              </p>
+                              <motion.div 
+                                className="flex justify-center space-x-1 mt-4"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.5 }}
+                              >
+                                {[0, 1, 2].map((i) => (
+                                  <motion.div
+                                    key={i}
+                                    className="w-2 h-2 bg-blue-400 rounded-full"
+                                    animate={{
+                                      scale: [1, 1.2, 1],
+                                      opacity: [0.5, 1, 0.5]
+                                    }}
+                                    transition={{
+                                      duration: 1.5,
+                                      repeat: Infinity,
+                                      delay: i * 0.2
+                                    }}
+                                  />
+                                ))}
+                              </motion.div>
+                            </motion.div>
+                          );
+                        }
+                        
                         // Use the stored enhanced therapist data
                         const enhancedData = enhancedTherapistData;
                         
-                        if (enhancedData) {
+                        if (enhancedData && supportGenerated) {
                           return (
-                            <>
+                            <motion.div
+                              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              transition={{ duration: 0.6, ease: "easeOut" }}
+                            >
                               {/* HIDDEN: Validation Section */}
                               {/* {enhancedData.validation && (
                                   <div className="p-6 bg-green-50 rounded-xl border border-green-200 shadow-sm">
@@ -1983,7 +2253,7 @@ Respond in this JSON format:
                                     <p className="text-gray-700 italic leading-relaxed">{enhancedData.selfCompassion}</p>
                                 </div>
                               )} */}
-                            </>
+                            </motion.div>
                           );
                         }
                         return null;
