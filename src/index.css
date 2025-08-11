@@ -64,6 +64,13 @@
   html {
     scroll-behavior: smooth;
     font-size: 90%; /* Base font size reduced by 10% */
+    zoom: 0.7; /* Shrinks whole UI proportionally without breaking layout flow */
+  }
+
+  @media screen and (max-width: 1024px) {
+    html {
+      zoom: 1; /* Keep normal zoom on mobile/tablet */
+    }
   }
 
   html, body {
