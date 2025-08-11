@@ -1,7 +1,7 @@
 import mcpService from './mcp';
 import { callOpenAI } from './openai';
 import { analyzeStressResponse } from './stressAnalysisLogic.js';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../lib/api';
 
 /**
  * Generate emotional suggestions using OpenAI with improved error handling
@@ -209,7 +209,7 @@ export async function analyzeStressLevel(answer, question, isPositive = false, u
   
   try {
     // Call the Express server API route for stress analysis
-    const res = await apiFetch("/api/analyze-stress", {
+    const res = await apiFetch("/ai/analyze-stress", {
       method: "POST",
       body: JSON.stringify({ question, answer, emotion: null }),
     });

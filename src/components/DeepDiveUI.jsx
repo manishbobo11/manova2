@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../lib/api';
 
 // Custom styles for react-select
 const selectStyles = {

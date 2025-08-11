@@ -1,6 +1,6 @@
 import { getEmbeddingFromAzure } from './embeddingService.js';
 import { AZURE_CONFIG, validateAzureConfig } from '../config/azure.js';
-import { apiFetch } from './api';
+import { apiFetch } from '../lib/api';
 
 /**
  * Test the fixes for embedding service and API endpoints

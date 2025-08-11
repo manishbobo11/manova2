@@ -1,6 +1,6 @@
 import { getEmbeddingFromAzure } from './embeddingService.js';
 import { AZURE_CONFIG, validateAzureConfig } from '../config/config.js';
-import { apiFetch } from './api';
+import { apiFetch } from '../lib/api';
 
 /**
  * Comprehensive test for all Manova fixes

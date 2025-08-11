@@ -2,7 +2,7 @@ import { ContextStore } from './firebase';
 import { toFirestoreSafe } from '../utils/firestoreSafe';
 import { getCheckinHistory } from './userSurveyHistory';
 import { contextualMemoryBuilder } from './userContextBuilder';
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../lib/api';
 
 function getDeepDivePrompt(domain, answers) {
   const context = answers.map(a => `Q: ${a.id}, Score: ${a.answer}`).join('\n');

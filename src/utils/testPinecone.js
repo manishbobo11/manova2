@@ -2,7 +2,7 @@
  * Test Pinecone connection with the configured credentials
  */
 
-import { apiFetch } from './api';
+import { apiFetch } from '../lib/api';
 export const testPineconeConnection = async () => {
   console.log('🧪 Testing Pinecone connection...');
   

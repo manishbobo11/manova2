@@ -7,7 +7,7 @@ import { getCheckinHistory } from '../userSurveyHistory.js';
 import { ContextStore } from '../firebase.js';
 import { querySimilarVectors } from '../../utils/vectorStore.js';
 import { createUltimatePersonalizedSarthiPrompt } from './ultimatePersonalizedSarthiPrompt.js';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../lib/api';
 
 // 🧠 Context Aggregation Functions for Sarthi
 /**

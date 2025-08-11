@@ -1,4 +1,4 @@
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../lib/api';
 
 export const analyzeResponses = async (responses) => {
   const res = await apiFetch('/api/analyze', {

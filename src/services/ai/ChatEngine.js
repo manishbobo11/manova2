@@ -8,7 +8,7 @@ import AgenticAI from './AgenticAI';
 import { getUserEmotionalHistory as getVectorHistory } from '../../utils/vectorStore';
 import { DeepConversationEngine } from './deepConversationEngine';
 import { getAdaptiveLanguageContext, detectMessageLanguage, getLanguageInstruction } from '../../utils/languageDetection';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../lib/api';
 
 export class ChatEngine {
   constructor() {

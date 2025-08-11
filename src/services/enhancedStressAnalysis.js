@@ -3,7 +3,7 @@
  * Provides per-question stress analysis with detailed emotional and contextual insights
  */
 
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../lib/api';
 
 /**
  * Analyze individual survey question response for stress indicators

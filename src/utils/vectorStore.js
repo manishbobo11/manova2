@@ -3,7 +3,7 @@
  * This avoids browser compatibility issues with the Pinecone client
  */
 
-import { apiFetch } from './api';
+import { apiFetch } from '../lib/api';
 
 /**
  * Upsert a user's emotional vector into Pinecone
