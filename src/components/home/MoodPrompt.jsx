@@ -78,16 +78,16 @@ const MoodPrompt = () => {
       transition={{ duration: 0.6 }}
       className="mb-12"
     >
-      <div className="text-center mb-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-3">
+      <div className="text-center mb-6 sm:mb-8">
+        <h2 className="h2 font-bold text-slate-900 mb-3">
           {homeContent.moodPrompt.title}
         </h2>
-        <p className="text-slate-600 text-lg">
+        <p className="text-slate-600 fluid-text-lg">
           {homeContent.moodPrompt.subtitle}
         </p>
       </div>
 
-      <div className="flex flex-wrap justify-center gap-4">
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
         {moods.map((mood) => (
           <motion.button
             key={mood.id}

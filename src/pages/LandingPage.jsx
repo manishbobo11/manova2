@@ -144,9 +144,9 @@ const LandingPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-white overflow-hidden">
+    <div className="min-h-screen w-full bg-white no-horizontal-scroll">
       {/* Main Content Section */}
-      <div className="w-full max-w-screen-xl mx-auto relative bg-white min-h-[calc(100vh-67px)] px-2 md:px-4 py-4 pt-12">
+      <div className="container-soft safe-area relative bg-white min-h-screen py-4 pt-12">
         {/* Animated Hero Section */}
         <AnimatedHeroSection />
 
@@ -156,14 +156,14 @@ const LandingPage = () => {
             {/* Title and Description Section */}
             <div className="flex flex-col items-center lg:items-start gap-4 w-full">
               {/* Main Headline */}
-              <h1 className="text-[56px] font-bold font-inter leading-tight text-balance mb-4">
+              <h1 className="h1 font-bold font-inter leading-tight text-balance mb-4 mobile-text">
                 <span className="text-black">Your AI-Powered </span>
                 <span className="text-[#007CFF]">Mental Health</span>
                 <span className="text-black"> Companion</span>
               </h1>
 
               {/* Description */}
-              <p className="text-[22px] font-normal font-inter text-black leading-[36px] w-full max-w-2xl mt-2 text-balance">
+              <p className="fluid-text-xl font-normal font-inter text-black leading-relaxed w-full max-w-2xl mt-2 text-balance mobile-text">
                 Transform your mental wellness journey with AI that understands, adapts and grows with you available 24/7 with complete privacy.
               </p>
             </div>
@@ -1000,7 +1000,7 @@ const LandingPage = () => {
                     <div className="absolute bottom-4 left-2 right-2">
                       <div className="w-full h-[39px] rounded-[16px] border border-[#D5D5D5] bg-white flex items-center px-4">
                         <div className="flex-1 text-gray-400 text-sm"></div>
-                        <div className="w-[39px] h-[39px] rounded-full bg-[#007CFF] flex items-center justify-center ml-2 -mr-4">
+                        <div className="w-[39px] h-[39px] rounded-full bg-[#007CFF] flex items-center justify-center ml-2">
                           <svg
                             className="w-5 h-5 text-white"
                             fill="currentColor"

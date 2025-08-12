@@ -96,10 +96,10 @@ const Navbar = () => {
     <>
       {/* Main Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-white border-none">
-        <div className="px-16 py-6 flex items-center justify-between">
+        <div className="safe-area px-4 sm:px-8 lg:px-16 py-6 flex items-center justify-between">
           {/* Brand Text */}
           <Link to={currentUser ? "/home" : "/"} className="flex items-center">
-            <h1 className="text-[48px] italic font-script text-[#1e3a8a] hover:text-[#1E40AF] transition-colors duration-300">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[48px] italic font-script text-[#1e3a8a] hover:text-[#1E40AF] transition-colors duration-300">
               Manova
             </h1>
           </Link>
@@ -251,7 +251,7 @@ const Navbar = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="w-full px-16 py-6">
+              <div className="w-full px-4 sm:px-8 lg:px-16 py-6">
                 {/* Mobile Navigation Links */}
                 <div className="space-y-4 mb-6">
                   {currentUser ? (

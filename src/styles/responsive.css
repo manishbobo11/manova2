@@ -1,0 +1,91 @@
+/* Responsive utilities for consistent mobile experience */
+
+/* Container utilities */
+.container-soft {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12;
+}
+
+.safe-area {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Prevent horizontal scroll */
+.no-horizontal-scroll {
+  @apply overflow-x-hidden;
+  max-width: 100vw;
+}
+
+/* Ensure body and html don't scroll horizontally */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Fix any potential width issues */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Responsive text utilities */
+.mobile-text {
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.h1 {
+  @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl;
+}
+
+.h2 {
+  @apply text-2xl sm:text-3xl md:text-4xl;
+}
+
+.h3 {
+  @apply text-xl sm:text-2xl md:text-3xl;
+}
+
+.fluid-text-xl {
+  @apply text-lg sm:text-xl md:text-xl;
+}
+
+.fluid-text-lg {
+  @apply text-base sm:text-lg md:text-lg;
+}
+
+/* Grid utilities */
+.responsive-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+}
+
+.responsive-grid-2 {
+  @apply grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10;
+}
+
+/* Button utilities */
+.btn-responsive {
+  @apply px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base;
+}
+
+/* Card utilities */
+.card-responsive {
+  @apply p-4 sm:p-6 rounded-lg sm:rounded-xl;
+}
+
+/* Mobile menu utilities */
+.mobile-menu-item {
+  @apply w-full text-left py-3 px-4 rounded-lg font-medium transition-all duration-300;
+}
+
+/* Spacing utilities */
+.section-spacing {
+  @apply py-8 sm:py-12 lg:py-16;
+}
+
+.content-spacing {
+  @apply space-y-6 sm:space-y-8 lg:space-y-12;
+}
+
+/* Responsive images */
+.responsive-avatar {
+  @apply w-48 h-48 sm:w-64 sm:h-64 md:w-72 md:h-72 lg:w-80 lg:h-80;
+}

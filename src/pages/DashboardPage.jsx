@@ -782,13 +782,13 @@ const DashboardPage = () => {
       )}
 
       {/* Main Content - Professional Dashboard Layout */}
-      <div className="max-w-[1440px] mx-auto px-4 py-10 grid grid-cols-12 gap-6 relative overflow-hidden">
+      <div className="container-soft safe-area section-spacing grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 relative no-horizontal-scroll">
         
         {/* Left Section - Main Dashboard Content (9 columns) */}
         <div className="col-span-12 lg:col-span-9 space-y-6">
           
           {/* Top Stats Cards Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="responsive-grid">
 
               {/* Current Mood */}
               <motion.div 

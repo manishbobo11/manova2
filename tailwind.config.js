@@ -5,7 +5,32 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    container: { 
+      center: true, 
+      padding: "1rem", 
+      screens: { 
+        sm:"640px", 
+        md:"768px", 
+        lg:"1024px", 
+        xl:"1280px" 
+      } 
+    },
+    screens: {
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+      '2xl': '1536px',
+    },
     extend: {
+      fontSize: {
+        "fluid-h1": ["clamp(24px,6vw,40px)", { lineHeight: "1.15" }],
+        "fluid-h2": ["clamp(20px,4.8vw,28px)", { lineHeight: "1.2" }],
+        "fluid-h3": ["clamp(18px,4vw,22px)", { lineHeight: "1.3" }],
+      },
+      height: { 
+        screen: "100dvh" 
+      },
       colors: {
         // Custom brand colors
         primary: {

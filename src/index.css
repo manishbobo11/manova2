@@ -1,6 +1,7 @@
 @import '@fontsource/inter/index.css';
 @import '@fontsource/archivo/index.css';
 @import './styles/contrast.css';
+@import './styles/mobile-foundation.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -63,21 +64,13 @@
 @layer base {
   html {
     scroll-behavior: smooth;
-    font-size: 90%; /* Base font size reduced by 10% */
-    zoom: 0.7; /* Shrinks whole UI proportionally without breaking layout flow */
-  }
-
-  @media screen and (max-width: 1024px) {
-    html {
-      zoom: 1; /* Keep normal zoom on mobile/tablet */
-    }
+    font-size: 100%; /* Normal font size */
   }
 
   html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
     border: none;
     outline: none;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

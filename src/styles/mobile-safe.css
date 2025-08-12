@@ -1,0 +1,126 @@
+/* Mobile-safe CSS - Comprehensive mobile optimization */
+
+:root {
+  --container-pad: 16px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;   /* ⟵ prevent cut-off scroll */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Avoid hard 100vh issues on mobile Safari/Chrome */
+.min-h-screen,
+.h-screen {
+  min-height: 100dvh !important; /* use dynamic viewport height */
+}
+
+/* Media assets should never overflow */
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Safe-area padding for notches */
+.page,
+.container,
+.safe-area {
+  padding-left: calc(var(--container-pad) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--container-pad) + env(safe-area-inset-right, 0px));
+}
+
+/* Headings scale smoothly across devices */
+h1, .h1 {
+  font-size: clamp(24px, 6vw, 40px);
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+h2, .h2 { 
+  font-size: clamp(20px, 4.8vw, 28px); 
+}
+
+h3, .h3 { 
+  font-size: clamp(18px, 4vw, 24px); 
+}
+
+/* Buttons/cards never exceed viewport width */
+button, .btn, .card, .panel {
+  max-width: 100%;
+}
+
+/* Cards/sections: use full width on mobile */
+.section,
+.card,
+.panel {
+  width: 100%;
+}
+
+/* Fluid text sizing */
+.fluid-text {
+  font-size: clamp(14px, 3.5vw, 16px);
+}
+
+.fluid-text-lg {
+  font-size: clamp(16px, 4vw, 18px);
+}
+
+.fluid-text-xl {
+  font-size: clamp(18px, 4.5vw, 20px);
+}
+
+/* Mobile-specific utilities */
+.mobile-safe {
+  padding-left: calc(var(--container-pad) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--container-pad) + env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
+.mobile-text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Prevent horizontal scroll on mobile */
+.no-horizontal-scroll {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Fluid container system */
+.fluid-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--container-pad);
+}
+
+@media (min-width: 640px) {
+  .fluid-container {
+    padding: 0 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fluid-container {
+    padding: 0 32px;
+  }
+}
+
+/* Ensure proper touch targets on mobile */
+@media (max-width: 767px) {
+  button, .btn, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

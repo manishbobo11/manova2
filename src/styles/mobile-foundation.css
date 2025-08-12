@@ -1,0 +1,140 @@
+/* Mobile Foundation - Comprehensive mobile-first responsive system */
+
+:root {
+  --g-pad: 16px;
+}
+
+*,
+*::before,
+*::after { 
+  box-sizing: border-box; 
+}
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;               /* stop right-edge cropping */
+  -webkit-text-size-adjust: 100%;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* viewport height fix for mobile Safari/Chrome */
+.h-screen, .min-h-screen { 
+  min-height: 100dvh !important; 
+}
+
+/* Notch safe-areas (use on page wrappers) */
+.safe-area {
+  padding-left:  calc(var(--g-pad) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--g-pad) + env(safe-area-inset-right, 0px));
+}
+
+/* Fluid headings/buttons via clamp */
+h1, .h1 { 
+  font-size: clamp(24px, 6vw, 40px); 
+  line-height: 1.15; 
+}
+
+h2, .h2 { 
+  font-size: clamp(20px, 4.8vw, 28px); 
+}
+
+h3, .h3 { 
+  font-size: clamp(18px, 4vw, 22px); 
+}
+
+button, .btn { 
+  max-width: 100%; 
+}
+
+/* Utility to cap content width while staying fluid */
+.container-soft {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--g-pad);
+}
+
+/* kill layout-breaking transforms/neg margins at small screens */
+@media (max-width: 767px) {
+  .no-mobile-overflow { 
+    transform: none !important; 
+    margin: 0 !important; 
+  }
+}
+
+/* Mobile-first grid patterns */
+.mobile-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .mobile-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+}
+
+/* Fluid text utilities */
+.text-fluid-sm {
+  font-size: clamp(14px, 3.5vw, 16px);
+}
+
+.text-fluid-base {
+  font-size: clamp(16px, 4vw, 18px);
+}
+
+.text-fluid-lg {
+  font-size: clamp(18px, 4.5vw, 20px);
+}
+
+.text-fluid-xl {
+  font-size: clamp(20px, 5vw, 24px);
+}
+
+/* Touch-friendly mobile targets */
+@media (max-width: 767px) {
+  button, .btn, [role="button"], .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent horizontal scroll on mobile */
+.no-horizontal-scroll {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Mobile-safe containers */
+.mobile-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--g-pad);
+}
+
+@media (min-width: 640px) {
+  .mobile-container {
+    padding: 0 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-container {
+    padding: 0 32px;
+  }
+}

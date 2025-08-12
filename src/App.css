@@ -3,7 +3,6 @@
   min-height: 100vh;
   margin: 0 auto;
   text-align: left;
-  overflow-x: hidden;
 }
 
 .logo {
@@ -46,11 +45,9 @@
 html, body, #root {
   min-height: 100vh;
   width: 100%;
-  overflow-x: hidden;
 }
 
 body {
-  overflow-x: hidden;
   position: relative;
 }
 
@@ -86,10 +83,7 @@ img, svg {
   }
 }
 
-/* Scale down content by 10% */
+/* Responsive content scaling - removed global scale hack */
 .scale-content {
-  transform: scale(0.9);
-  transform-origin: top center;
-  width: 111.11%; /* Compensate for scale to maintain full width */
-  margin-left: -5.56%; /* Center the scaled content */
+  /* Removed transform scale - use proper responsive design instead */
 }

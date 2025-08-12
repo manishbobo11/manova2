@@ -37,7 +37,7 @@ const ToolsGrid = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="mobile-grid">
         {tools.map((tool, index) => (
           <motion.div
             key={tool.title}

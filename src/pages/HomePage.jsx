@@ -69,8 +69,8 @@ const HomePage = () => {
   const greeting = getDynamicGreeting();
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
+    <main className="min-h-screen bg-slate-50 text-slate-900 no-horizontal-scroll">
+      <div className="container-soft safe-area py-8 sm:py-12">
         {/* Hero Section */}
         <motion.section
           initial={{ opacity: 0, y: 16 }}
@@ -79,10 +79,10 @@ const HomePage = () => {
           className="mb-16 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center"
         >
           <div>
-            <motion.h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4">
+            <motion.h1 className="h1 font-bold text-slate-900 mb-4 mobile-text">
               {greeting.text}
             </motion.h1>
-            <motion.p className="text-lg md:text-xl text-slate-600 mb-6">
+            <motion.p className="fluid-text-xl text-slate-600 mb-6 mobile-text">
               {greeting.subtitle}
             </motion.p>
             <motion.div
@@ -131,29 +131,29 @@ const HomePage = () => {
             transition={{ duration: 0.7, delay: 0.2 }}
             className="flex justify-center lg:justify-end"
           >
-            <div className="bg-white rounded-lg shadow-sm ring-1 ring-slate-200 p-6 w-64 h-64 md:w-72 md:h-72 lg:w-80 lg:h-80 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-sm ring-1 ring-slate-200 p-6 responsive-avatar flex items-center justify-center">
               <span className="text-6xl" aria-label="avatar">🧑‍💻</span>
             </div>
           </motion.div>
         </motion.section>
 
         {/* Mood Prompt Section */}
-        <section className="mx-auto max-w-6xl px-6 mt-6">
+        <section className="mt-6">
           <MoodPrompt />
         </section>
 
         {/* Tools Grid Section */}
-        <section className="mx-auto max-w-6xl px-6 mt-8">
+        <section className="mt-8">
           <ToolsGrid />
         </section>
 
         {/* Quick Tools Section */}
-        <section className="mx-auto max-w-6xl px-6 mt-10">
+        <section className="mt-10">
           <QuickTools />
         </section>
 
         {/* Insights Strip Section */}
-        <section className="mx-auto max-w-6xl px-6 my-12">
+        <section className="my-12">
           <InsightsStrip />
         </section>
       </div>

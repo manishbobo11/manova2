@@ -1,4 +1,5 @@
 import express from 'express';
+import bodyParser from 'body-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
@@ -289,7 +290,32 @@ app.post('/api/enhanced-stress-analysis', (req, res) => {
 // GPT-powered analyze-stress route using Azure OpenAI
 app.post('/api/analyze-stress', async (req, res) => {
   try {
-    const { question, answer, domain, questionId } = req.body;
+    const { question, answer, domain, questionId, responses } = req.body;
+
+    // Handle new responses array format
+    if (responses && Array.isArray(responses)) {
+      console.log('🔍 Simple analyze-stress API called with responses array');
+      
+      // Temporary mock stress analysis logic
+      const stressScore = Math.floor(Math.random() * 10) + 1; // 1-10 score
+      const mood =
+        stressScore <= 3
+          ? "relaxed"
+          : stressScore <= 6
+          ? "neutral"
+          : "very stressed";
+
+      return res.json({
+        score: stressScore,
+        mood,
+        message: `Your mood is ${mood}, score: ${stressScore}`,
+      });
+    }
+
+    // Handle existing format
+    if (!question || !answer) {
+      return res.status(400).json({ error: "Invalid request data" });
+    }
 
     console.log('🔍 GPT analyze-stress API called with:', { question, answer, domain, questionId });
 
@@ -392,6 +418,8 @@ Use psychological insight. Think like a therapist. ONLY return the JSON.
     });
   }
 });
+
+
 
 // OpenAI Chat route for GPT-based deep-dive follow-up suggestions
 app.post('/api/openai-chat', async (req, res) => {
