@@ -8,20 +8,50 @@ import vectorRouter from './routes/vectorRoutes.js';
 dotenv.config();
 const app = express();
 
-// CORS configuration for Vercel frontend
-app.use(cors({
-  origin: [
-    'https://manova.vercel.app',
-    'https://manova-git-main.vercel.app',
-    'https://manova-git-develop.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+// Robust CORS handling for Render ↔️ Vercel
+const allowedOrigins = [
+  'https://www.manova.life',
+  'https://manova.life',
+  'https://manova.vercel.app',
+  'https://manova-git-main.vercel.app',
+  'https://manova-git-develop.vercel.app',
+  // add local dev if needed:
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow same-origin / curl / server-to-server requests
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    return callback(new Error('CORS not allowed from origin: ' + origin));
+  },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: false // set true only if you actually use cookies/auth headers across origins
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// Must handle preflight early
+app.options('*', cors(corsOptions));
+
+// (Optional) Set explicit headers for any non-cors library quirks
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 app.use(express.json());
 

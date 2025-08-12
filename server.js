@@ -88,15 +88,46 @@ app.use(compression({
   }
 }));
 
-// CORS configuration
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://manova.life', 'https://www.manova.life']
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+// Robust CORS handling for Render ↔️ Vercel
+const allowedOrigins = [
+  'https://www.manova.life',
+  'https://manova.life',
+  // add local dev if needed:
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow same-origin / curl / server-to-server requests
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    return callback(new Error('CORS not allowed from origin: ' + origin));
+  },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: false // set true only if you actually use cookies/auth headers across origins
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// Must handle preflight early
+app.options('*', cors(corsOptions));
+
+// (Optional) Set explicit headers for any non-cors library quirks
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 // Health check endpoint for UptimeRobot
 app.get('/health', (req, res) => {
@@ -131,7 +162,6 @@ app.use((err, req, res, next) => {
 });
 
 dotenv.config();
-app.use(cors());
 app.use(express.json());
 
 app.post('/api/vector/upsert', async (req, res) => {
