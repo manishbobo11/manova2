@@ -1,12 +1,10 @@
 {
   "name": "manova-backend",
-  "version": "1.0.0",
-  "description": "Manova Backend API Server",
-  "main": "src/server.js",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/server.cjs",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.cjs"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -18,8 +16,5 @@
   },
   "engines": {
     "node": "20.x"
-  },
-  "keywords": ["manova", "backend", "api", "wellness"],
-  "author": "Manova Team",
-  "license": "MIT"
+  }
 } 

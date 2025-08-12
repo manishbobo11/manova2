@@ -1,5 +1,5 @@
 const express = require('express');
-const { querySimilarVectorsHandler, upsertVectorHandler } = require('../controllers/vectorController');
+const { querySimilarVectorsHandler, upsertVectorHandler } = require('../controllers/vectorController.cjs');
 
 const router = express.Router();
 
