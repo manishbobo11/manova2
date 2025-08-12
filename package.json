@@ -23,7 +23,7 @@
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
-    "express": "^5.1.0",
+    "express": "^4.18.2",
     "firebase": "^11.10.0",
     "framer-motion": "^10.18.0",
     "franc": "^6.2.0",
