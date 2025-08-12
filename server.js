@@ -4,7 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { Pinecone } from '@pinecone-database/pinecone';
-import vectorRouter from './routes/vectorRoutes.js';
+// import vectorRouter from './routes/vectorRoutes.js';
 import path from 'path';
 import https from 'https';
 import http from 'http';
@@ -1344,7 +1344,7 @@ Draft: ${draftReply}`;
 });
 
 // Vector routes
-app.use('/api/vector', vectorRouter);
+// app.use('/api/vector', vectorRouter);
 
 // Start server with the PORT defined at the top
 app.listen(PORT, () => {

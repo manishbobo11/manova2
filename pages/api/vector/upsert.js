@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     // Get the index and validate existence
     let index;
     try {
-      index = pinecone.Index(indexName);
+      index = pinecone.index(indexName);
       console.log('✅ Pinecone index accessed successfully');
       
       // Validate index existence and health
