@@ -1,6 +1,6 @@
-import { Pinecone } from '@pinecone-database/pinecone';
+const { Pinecone } = require('@pinecone-database/pinecone');
 
-export const querySimilarVectorsHandler = async (req, res) => {
+const querySimilarVectorsHandler = async (req, res) => {
   try {
     const { userId, embedding, topK = 5, filter = {} } = req.body;
     
@@ -98,7 +98,7 @@ export const querySimilarVectorsHandler = async (req, res) => {
   }
 };
 
-export const upsertVectorHandler = async (req, res) => {
+const upsertVectorHandler = async (req, res) => {
   try {
     const { userId, embedding, metadata } = req.body;
     
@@ -199,4 +199,9 @@ export const upsertVectorHandler = async (req, res) => {
       message: err.message
     });
   }
+}; 
+
+module.exports = {
+  querySimilarVectorsHandler,
+  upsertVectorHandler
 }; 

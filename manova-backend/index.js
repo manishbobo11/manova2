@@ -1,25 +1,18 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import axios from 'axios';
-import { Pinecone } from '@pinecone-database/pinecone';
-import vectorRouter from './routes/vectorRoutes.js';
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const axios = require('axios');
+const { Pinecone } = require('@pinecone-database/pinecone');
+const vectorRouter = require('./routes/vectorRoutes');
 
 dotenv.config();
 const app = express();
 
-// Robust CORS handling for Render ↔️ Vercel
+// CORS configuration for allowed domains
 const allowedOrigins = [
-  'https://www.manova.life',
   'https://manova.life',
-  'https://manova.vercel.app',
-  'https://manova-git-main.vercel.app',
-  'https://manova-git-develop.vercel.app',
-  // add local dev if needed:
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173'
+  'https://www.manova.life',
+  'http://localhost:3000'
 ];
 
 const corsOptions = {
@@ -31,7 +24,7 @@ const corsOptions = {
   },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
-  credentials: false // set true only if you actually use cookies/auth headers across origins
+  credentials: false
 };
 
 // Apply CORS globally
@@ -40,7 +33,7 @@ app.use(cors(corsOptions));
 // Must handle preflight early
 app.options('*', cors(corsOptions));
 
-// (Optional) Set explicit headers for any non-cors library quirks
+// Set explicit headers for any non-cors library quirks
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
@@ -55,8 +48,16 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Health check endpoint
+// Health check endpoints
 app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    service: 'manova-backend'
+  });
+});
+
+app.get('/healthz', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
