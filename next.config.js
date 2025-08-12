@@ -9,8 +9,8 @@ const nextConfig = {
       // { source: '/api/gpt', destination: 'https://manova2.onrender.com/ai/sarthi/chat' },
 
       // ✅ General proxy: forward /api/* to backend (keeps other calls working)
-      { source: '/api/ai/:path*', destination: 'https://manova2.onrender.com/ai/:path*' },
-      { source: '/api/:path*', destination: 'https://manova2.onrender.com/:path*' },
+      { source: '/api/ai/(.*)', destination: 'https://manova2.onrender.com/ai/$1' },
+      { source: '/api/(.*)', destination: 'https://manova2.onrender.com/$1' },
     ];
   },
 };
