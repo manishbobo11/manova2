@@ -154,14 +154,14 @@
 ## SEO & Social Media Optimization ✅
 
 ### 1. Meta Tags Implementation
-- ✅ **Updated title**: "Manova - Your AI-Powered Mental Wellness Companion"
-- ✅ **Added description**: Comprehensive meta description for search engines
+- ✅ **Updated title**: "Manova – Your AI Wellness Companion"
+- ✅ **Added description**: "Prioritize your mental wellness. Try Manova today."
 - ✅ **Added keywords**: Relevant mental health and wellness keywords
 - ✅ **Added author and robots**: Proper SEO meta tags
 
 ### 2. Open Graph Tags
-- ✅ **og:title**: Matches page title for social sharing
-- ✅ **og:description**: Optimized description for social media
+- ✅ **og:title**: "Manova – Your AI Wellness Companion"
+- ✅ **og:description**: "Prioritize your mental wellness. Try Manova today."
 - ✅ **og:type**: Set to "website"
 - ✅ **og:url**: Points to https://manova.life/
 - ✅ **og:image**: References https://manova.life/og-image.png
@@ -170,8 +170,8 @@
 
 ### 3. Twitter Card Tags
 - ✅ **twitter:card**: Set to "summary_large_image"
-- ✅ **twitter:title**: Optimized for Twitter sharing
-- ✅ **twitter:description**: Tailored for Twitter audience
+- ✅ **twitter:title**: "Manova – Your AI Wellness Companion"
+- ✅ **twitter:description**: "Prioritize your mental wellness. Try Manova today."
 - ✅ **twitter:image**: Same og-image for consistency
 
 ### 4. Additional SEO Features
