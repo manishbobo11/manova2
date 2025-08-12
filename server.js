@@ -5,13 +5,10 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import { Pinecone } from '@pinecone-database/pinecone';
 import vectorRouter from './routes/vectorRoutes.js';
-
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const https = require('https');
-const http = require('http');
-const compression = require('compression');
+import path from 'path';
+import https from 'https';
+import http from 'http';
+import compression from 'compression';
 
 // Global HTTP/HTTPS keep-alive agents for Azure requests
 const httpsAgent = new https.Agent({
