@@ -1,14 +1,20 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const dotenv = require('dotenv');
-const axios = require('axios');
 const { Pinecone } = require('@pinecone-database/pinecone');
 const vectorRouter = require('./routes/vectorRoutes');
 
+// Load environment variables
 dotenv.config();
+
+// Initialize Express app (ONCE)
 const app = express();
 
-// CORS configuration for allowed domains
+// Parse JSON bodies
+app.use(express.json());
+
+// Strict CORS configuration for manova.life
 const allowedOrigins = [
   'https://manova.life',
   'https://www.manova.life',
@@ -16,39 +22,23 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow same-origin / curl / server-to-server requests
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
-    return callback(new Error('CORS not allowed from origin: ' + origin));
+  origin: function (origin, cb) {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
   },
+  credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
-  credentials: false
+  allowedHeaders: ['Content-Type','Authorization']
 };
 
 // Apply CORS globally
 app.use(cors(corsOptions));
-
-// Must handle preflight early
 app.options('*', cors(corsOptions));
 
-// Set explicit headers for any non-cors library quirks
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Vary', 'Origin');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+// Health check endpoint (top of routes)
+app.get('/healthz', (req, res) => res.status(200).send('ok'));
 
-app.use(express.json());
-
-// Health check endpoints
+// Legacy health endpoint for compatibility
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
@@ -57,14 +47,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/healthz', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    service: 'manova-backend'
-  });
-});
-
+// Vector upsert endpoint (moved from index.js)
 app.post('/api/vector/upsert', async (req, res) => {
   try {
     const { userId, embedding, metadata } = req.body;
@@ -183,11 +166,17 @@ app.post('/api/vector/upsert', async (req, res) => {
 // Vector routes
 app.use('/api/vector', vectorRouter);
 
-// Use PORT from environment variable (Render) or default to 5174
-const PORT = process.env.PORT || 5174;
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
-app.listen(PORT, () => {
-  console.log(`✅ Manova Backend running on port ${PORT}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-}); 
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Start server (ONLY ONE listener)
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`API listening on ${PORT}`));
