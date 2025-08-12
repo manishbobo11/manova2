@@ -42,6 +42,7 @@ import SleepStoriesPage from './pages/SleepStoriesPage';
 import AssessmentHistory from './components/AssessmentHistory';
 import DetailsPage from './pages/DetailsPage';
 import SurveyInsight from './pages/SurveyInsight';
+import StreamingChatDemo from './pages/StreamingChatDemo';
 
 const App = () => {
   // In a real app, this would come from your authentication system
@@ -225,6 +226,14 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AppLayout><SarthiChatbotDemo /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/streaming-chat"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><StreamingChatDemo /></AppLayout>
                     </ProtectedRoute>
                   }
                 />

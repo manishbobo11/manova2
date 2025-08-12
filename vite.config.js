@@ -8,5 +8,18 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8001'
     }
+  },
+  build: {
+    sourcemap: process.env.NODE_ENV !== 'production',
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['framer-motion', 'lucide-react'],
+          charts: ['chart.js', 'react-chartjs-2', 'recharts']
+        }
+      }
+    }
   }
 })

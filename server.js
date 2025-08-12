@@ -6,8 +6,131 @@ import axios from 'axios';
 import { Pinecone } from '@pinecone-database/pinecone';
 import vectorRouter from './routes/vectorRoutes.js';
 
-dotenv.config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const https = require('https');
+const http = require('http');
+const compression = require('compression');
+
+// Global HTTP/HTTPS keep-alive agents for Azure requests
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 50,
+  maxFreeSockets: 10,
+  timeout: 12000, // 12s timeout
+  freeSocketTimeout: 30000,
+});
+
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 50,
+  maxFreeSockets: 10,
+  timeout: 12000, // 12s timeout
+  freeSocketTimeout: 30000,
+});
+
+// Log regions on boot for geographic proximity verification
+const logRegions = () => {
+  console.log('🌍 Region Information:');
+  console.log(`   Render Region: ${process.env.RENDER_REGION || 'Unknown'}`);
+  console.log(`   Azure Region: ${process.env.AZURE_OPENAI_REGION || 'Unknown'}`);
+  console.log(`   Timezone: ${process.env.TZ || 'UTC'}`);
+  
+  // Check if regions are geographically close
+  const renderRegion = process.env.RENDER_REGION?.toLowerCase();
+  const azureRegion = process.env.AZURE_OPENAI_REGION?.toLowerCase();
+  
+  if (renderRegion && azureRegion) {
+    const closeRegions = {
+      'us-east-1': ['eastus', 'eastus2'],
+      'us-west-1': ['westus', 'westus2', 'westus3'],
+      'us-central-1': ['centralus', 'northcentralus', 'southcentralus'],
+      'eu-west-1': ['westeurope', 'northeurope'],
+      'ap-southeast-1': ['southeastasia', 'eastasia'],
+    };
+    
+    const isClose = closeRegions[renderRegion]?.includes(azureRegion) || 
+                   closeRegions[azureRegion]?.includes(renderRegion);
+    
+    console.log(`   Geographic Proximity: ${isClose ? '✅ Close' : '⚠️  Distant'}`);
+  }
+};
+
+// Production optimizations
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  console.log('🚀 Running in PRODUCTION mode');
+  // Disable source maps in production
+  process.env.GENERATE_SOURCEMAP = 'false';
+} else {
+  console.log('🔧 Running in DEVELOPMENT mode');
+}
+
+// Log regions on startup
+logRegions();
+
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Enable GZIP compression for all responses
+app.use(compression({
+  level: 6, // Balanced compression level
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    // Don't compress SSE responses
+    if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://manova.life', 'https://www.manova.life']
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Health check endpoint for UptimeRobot
+app.get('/health', (req, res) => {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    regions: {
+      render: process.env.RENDER_REGION || 'Unknown',
+      azure: process.env.AZURE_OPENAI_REGION || 'Unknown'
+    },
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  res.status(200).json(health);
+});
+
+// Enhanced error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err);
+  
+  // Don't leak error details in production
+  const errorMessage = isProduction 
+    ? 'Internal server error' 
+    : err.message;
+  
+  res.status(500).json({ 
+    error: errorMessage,
+    timestamp: new Date().toISOString()
+  });
+});
+
+dotenv.config();
 app.use(cors());
 app.use(express.json());
 
@@ -467,14 +590,17 @@ app.post('/api/openai-chat', async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "api-key": azureKey
+        "api-key": azureKey,
+        "Connection": "keep-alive"
       },
       body: JSON.stringify({
         messages: messages,
         temperature: 0.7,
         max_tokens: 500,
         stream: false
-      })
+      }),
+      agent: httpsAgent,
+      signal: AbortSignal.timeout(12000) // 12s timeout
     });
 
     const data = await response.json();
@@ -554,28 +680,31 @@ Provide warm, personalized therapeutic guidance.`;
       // Call Azure OpenAI GPT-4o
       const endpoint = `${azureEndpoint}/openai/deployments/${azureDeployment}/chat/completions?api-version=${azureVersion}`;
       
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": azureKey
-        },
-        body: JSON.stringify({
-          messages: [
-            { 
-              role: "system", 
-              content: "You are a compassionate, licensed mental health therapist. Provide empathetic, practical guidance in a warm, professional tone." 
-            },
-            { 
-              role: "user", 
-              content: prompt 
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 300,
-          stream: false
-        })
-      });
+          const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": azureKey,
+        "Connection": "keep-alive"
+      },
+      body: JSON.stringify({
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a compassionate, licensed mental health therapist. Provide empathetic, practical guidance in a warm, professional tone." 
+          },
+          { 
+            role: "user", 
+            content: prompt 
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300,
+        stream: false
+      }),
+      agent: httpsAgent,
+      signal: AbortSignal.timeout(12000) // 12s timeout
+    });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -1054,13 +1183,16 @@ FORMATTING RULES:
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "api-key": azureKey
+        "api-key": azureKey,
+        "Connection": "keep-alive"
       },
       body: JSON.stringify({
         messages: finalMessages,
         temperature: 0.6, // Balanced for warmth + consistency
         max_tokens: 200,
-      })
+      }),
+      agent: httpsAgent,
+      signal: AbortSignal.timeout(12000) // 12s timeout
     });
 
     if (!response.ok) {
@@ -1083,7 +1215,8 @@ Draft: ${draftReply}`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "api-key": azureKey
+        "api-key": azureKey,
+        "Connection": "keep-alive"
       },
       body: JSON.stringify({
         messages: [
@@ -1092,7 +1225,9 @@ Draft: ${draftReply}`;
         ],
         temperature: 0.5,
         max_tokens: 200,
-      })
+      }),
+      agent: httpsAgent,
+      signal: AbortSignal.timeout(12000) // 12s timeout
     });
     
     if (critiqueResponse.ok) {
@@ -1152,13 +1287,16 @@ Draft: ${draftReply}`;
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "api-key": azureKey
+          "api-key": azureKey,
+          "Connection": "keep-alive"
         },
         body: JSON.stringify({
           messages: strictMessages,
           temperature: 0.6, // Balanced for consistency
           max_tokens: 200,
-        })
+        }),
+        agent: httpsAgent,
+        signal: AbortSignal.timeout(12000) // 12s timeout
       });
       
       const retryData = await retryResponse.json();
@@ -1181,7 +1319,9 @@ Draft: ${draftReply}`;
 // Vector routes
 app.use('/api/vector', vectorRouter);
 
-const PORT = 8001;
+// Start server with the PORT defined at the top
 app.listen(PORT, () => {
-  console.log(`✅ Vector backend running at http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`   Health check: http://localhost:${PORT}/health`);
 }); 
