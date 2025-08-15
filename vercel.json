@@ -1,20 +1,6 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
-
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "www.manova.life" }],
-      "destination": "https://manova.life/$1",
-      "permanent": true
-    }
-  ],
-
+  "version": 2,
   "rewrites": [
-    {
-      "source": "/((?!api|_next/static|_next/image|.*\\..*).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
