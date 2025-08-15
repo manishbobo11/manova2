@@ -43,6 +43,7 @@ import AssessmentHistory from './components/AssessmentHistory';
 import DetailsPage from './pages/DetailsPage';
 import SurveyInsight from './pages/SurveyInsight';
 import StreamingChatDemo from './pages/StreamingChatDemo';
+import ArticleDetailPage from './pages/ArticleDetailPage';
 
 const App = () => {
   // In a real app, this would come from your authentication system
@@ -170,6 +171,14 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AppLayout><ArticlesPage /></AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/articles/:slug"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout><ArticleDetailPage /></AppLayout>
                     </ProtectedRoute>
                   }
                 />

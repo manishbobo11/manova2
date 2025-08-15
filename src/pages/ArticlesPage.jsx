@@ -189,6 +189,7 @@ const ArticlesPage = () => {
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ y: -12, scale: 1.02, transition: { duration: 0.3 } }}
                   className="bg-white/70 backdrop-blur-sm border border-white/50 rounded-3xl shadow-lg hover:shadow-xl hover:bg-white/80 transition-all duration-300 overflow-hidden group cursor-pointer"
+                  onClick={() => navigate(`/articles/${article.slug || article.id}`)}
                 >
                   {/* Article Image */}
                   <div className="relative overflow-hidden">
@@ -240,7 +241,13 @@ const ArticlesPage = () => {
 
                     {/* Read More Button */}
                     <div className="mt-4 flex items-center justify-end">
-                      <div className="flex items-center text-blue-600 font-semibold text-sm group-hover:text-blue-700 transition-colors duration-300">
+                      <div 
+                        className="flex items-center text-blue-600 font-semibold text-sm group-hover:text-blue-700 transition-colors duration-300 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/articles/${article.slug || article.id}`);
+                        }}
+                      >
                         <span>Read More</span>
                         <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
                       </div>

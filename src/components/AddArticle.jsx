@@ -14,7 +14,8 @@ const AddArticle = ({ isOpen, onClose, onArticleAdded }) => {
     author: '',
     readTime: '',
     image: '',
-    tags: ''
+    tags: '',
+    slug: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +29,21 @@ const AddArticle = ({ isOpen, onClose, onArticleAdded }) => {
       ...prev,
       [name]: value
     }));
+    
+    // Auto-generate slug from title
+    if (name === 'title') {
+      const slug = value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim('-');
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        slug: slug
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -66,7 +82,8 @@ const AddArticle = ({ isOpen, onClose, onArticleAdded }) => {
         author: '',
         readTime: '',
         image: '',
-        tags: ''
+        tags: '',
+        slug: ''
       });
 
       if (onArticleAdded) {
@@ -143,6 +160,25 @@ const AddArticle = ({ isOpen, onClose, onArticleAdded }) => {
                     placeholder="Enter article title"
                     required
                   />
+                </div>
+
+                {/* Slug */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    URL Slug
+                  </label>
+                  <input
+                    type="text"
+                    name="slug"
+                    value={formData.slug}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
+                    placeholder="auto-generated from title"
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-generated from title. This will be used in the article URL.
+                  </p>
                 </div>
 
                 {/* Category */}
