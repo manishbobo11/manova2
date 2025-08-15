@@ -79,3 +79,4 @@ Once configured, you can view:
 - Downtime history
 - Geographic performance
 - SSL certificate status
+

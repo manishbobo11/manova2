@@ -27,3 +27,4 @@ const StreamingChatDemo = () => {
 };
 
 export default StreamingChatDemo;
+
