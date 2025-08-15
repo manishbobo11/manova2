@@ -1,4 +1,7 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
+
   "redirects": [
     {
       "source": "/(.*)",
@@ -7,6 +10,7 @@
       "permanent": true
     }
   ],
+
   "rewrites": [
     {
       "source": "/((?!api|_next/static|_next/image|.*\\..*).*)",
